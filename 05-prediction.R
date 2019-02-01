@@ -1,7 +1,10 @@
 # Setup ----------------------------------------
 
-library(dplyr)
 library(sp)
+library(ggplot2)
+library(MASS)
+library(MuMIn)
+library(dplyr)
 
 select = dplyr::select
 
@@ -99,8 +102,8 @@ wetland_dist = raster::raster('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.
 
 predict_grid@data$Distance_to_wetland = raster::extract(wetland_dist, predict_grid)
 
-ggplot(predict_grid@data) +
-  geom_raster(aes(x = Easting, y = Northing, fill = Snow))
+# ggplot(predict_grid@data) +
+#   geom_raster(aes(x = Easting, y = Northing, fill = Snow))
 
 # Perform prediction ------------------------------------------------------------------------------------------------
 
@@ -114,13 +117,18 @@ scale  = covariate_scaled_attr$Scale[c(2,1,6,3,4,5)]
 temp = apply(X = predict_grid_complete@data, MARGIN = 1, FUN = function(x){x - center}) %>% t
 predict_grid_scaled@data = apply(X = temp, MARGIN = 1, FUN = function(x){x / scale}) %>% t %>% as.data.frame
 
-top_model = MuMIn::get.models(out_nb_fmagna, subset = delta == 0)
-top_model_dsl = MuMIn::get.models(out_nb_dsl, subset = delta == 0)
+top_model = MuMIn::get.models(out_nb_fmagna, subset = delta == 0)[[1]]
+top_model_dsl = MuMIn::get.models(out_nb_dsl, subset = delta == 0)[[1]]
+
+# Add temporal effects -- just reference category  -------------
+
+predict_grid_scaled@data$Year = factor(2016)
+predict_grid_scaled@data$JulianDay = 0
 
 # Predict fmagna
-pr_out = predict(top_model$`255`, newdata = predict_grid_scaled@data, type = 'response')
+pr_out = predict(top_model, newdata = predict_grid_scaled@data, type = 'response')
 # Predict dsl
-pr_out_dsl = predict(top_model_dsl$`111`, newdata = predict_grid_scaled@data, type = 'response')
+pr_out_dsl = predict(top_model_dsl, newdata = predict_grid_scaled@data, type = 'response')
 
 # Fmagna assign
 predict_grid_scaled@data$PredictedIntensity = pr_out
@@ -150,6 +158,16 @@ ggplot(predict_grid_complete@data) +
   coord_equal()
 dev.off()
 
+Cairo::Cairo(width = 768*3, height = 1024*3, dpi = 150*2, file = 'images/intensity_dsl_top_nb_log.png')
+ggplot(predict_grid_complete@data) +
+  geom_raster(aes(x = Easting, y = Northing, fill = PredictedIntensity_dsl)) + 
+  viridis::scale_fill_viridis(option = "B", trans = 'log') + 
+  theme_bw() + 
+  theme(panel.grid = element_blank()) + 
+  coord_equal()
+dev.off()
+
+
 
 # Relationships -----------------------------
 
@@ -157,14 +175,15 @@ dev.off()
 
 sampled_elevation = data$Elevation * covariate_scaled_attr$Scale[6] + covariate_scaled_attr$Center[6]
 
-new_dat = with(data, data.frame(Northing = mean(Northing), Easting = mean(Easting), 
-                                                    Elevation = seq(min(Elevation), max(Elevation), length = 1000),
-                                                    Precipitation = mean(Precipitation), Snow = mean(Snow),
-                                                    Distance_to_wetland = mean(Distance_to_wetland)
-                                                    )
-)
+new_dat = with(data, data.frame(Northing = mean(Northing), Easting = mean(Easting),
+                                Elevation = seq(min(Elevation), max(Elevation), length = 1000),
+                                Precipitation = mean(Precipitation), Snow = mean(Snow),
+                                Distance_to_wetland = mean(Distance_to_wetland),
+                                Year = factor(2016)
+                                )
+               )
 
-predicted_intensity = predict(top_model$`255`, newdata = new_dat, type = 'response')
+predicted_intensity = predict(top_model, newdata = new_dat, type = 'response')
 
 
 plot_data = data.frame(Elevation = with(data, seq(min(sampled_elevation), max(sampled_elevation), length = 1000)), Intensity = predicted_intensity)
@@ -181,67 +200,78 @@ dev.off()
 
 # What's the relationship with precipitation
 
-new_dat = with(data, data.frame(Northing = mean(Northing), Easting = mean(Easting), 
-                                                    Elevation = mean(Elevation),
-                                                    Precipitation = seq(min(Precipitation), max(Precipitation), length.out = 1000), 
-                                                    Snow = mean(Snow),
-                                                    Distance_to_wetland = mean(Distance_to_wetland)
-                                                    )
-)
-
-predicted_intensity = predict(top_model$`255`, newdata = new_dat, type = 'response')
-
-sampled_precip = data$Precipitation * covariate_scaled_attr$Scale[3] + covariate_scaled_attr$Center[3]
-
-plot_data = data.frame(Precipitation = with(data, seq(min(sampled_precip), max(sampled_precip), length = 1000)), `Predicted Intensity` = predicted_intensity)
-
-plot_points = data.frame(Precipitation = sampled_precip,
-                         Intensity = data$fmagna_ff)
-
-Cairo::Cairo(file = 'images/precipitation_rel_fmagna.png', dpi = 150)
-ggplot(plot_data) + 
-  geom_line(aes(x = Precipitation, y = predicted_intensity)) + 
-  geom_point(data = plot_points, aes(x = Precipitation, y = Intensity), alpha = 0.05) + 
-  theme_bw() + ylab("Intensity per Fecal Sample")
-dev.off()
+# new_dat = with(
+#   data,
+#   data.frame(
+#     Northing = mean(Northing),
+#     Easting = mean(Easting),
+#     Elevation = mean(Elevation),
+#     Precipitation = seq(min(Precipitation), max(Precipitation), length.out = 1000),
+#     Snow = mean(Snow),
+#     Distance_to_wetland = mean(Distance_to_wetland),
+#     Year = factor(2016)
+#   )
+# )
+# 
+# predicted_intensity = predict(top_model, newdata = new_dat, type = 'response')
+# 
+# sampled_precip = data$Precipitation * covariate_scaled_attr$Scale[3] + covariate_scaled_attr$Center[3]
+# 
+# plot_data = data.frame(Precipitation = with(data, seq(min(sampled_precip), max(sampled_precip), length = 1000)), `Predicted Intensity` = predicted_intensity)
+# 
+# plot_points = data.frame(Precipitation = sampled_precip,
+#                          Intensity = data$fmagna_ff)
+# 
+# Cairo::Cairo(file = 'images/precipitation_rel_fmagna.png', dpi = 150)
+# ggplot(plot_data) +
+#   geom_line(aes(x = Precipitation, y = predicted_intensity)) +
+#   geom_point(data = plot_points, aes(x = Precipitation, y = Intensity), alpha = 0.05) +
+#   theme_bw() + ylab("Intensity per Fecal Sample")
+# dev.off()
 
 # What's the relationship with snow
 
-sampled_snow = data$Snow * covariate_scaled_attr$Scale[4] + covariate_scaled_attr$Center[4]
-
-new_dat = with(data, data.frame(Northing = mean(Northing), Easting = mean(Easting), 
-                                                    Elevation = mean(Elevation),
-                                                    Precipitation = mean(Precipitation), 
-                                                    Snow = seq(min(Snow), max(Snow), length = 1000),
-                                                    Distance_to_wetland = mean(Distance_to_wetland)
-                                                    ))
-
-predicted_intensity = predict(top_model$`255`, newdata = new_dat, type = 'response')
-
-plot_data = data.frame(Snow = with(data, seq(min(sampled_snow), max(sampled_snow), length = 1000)), `Predicted Intensity` = predicted_intensity)
-
-plot_points = data.frame(Snow = sampled_snow,
-                         Intensity = data$fmagna_ff)
-
-Cairo::Cairo(file = 'images/snow_rel_fmagna.png', dpi = 150)
-ggplot(plot_data) + 
-  geom_line(aes(x = Snow, y = predicted_intensity)) + 
-  geom_point(data = plot_points, aes(x = Snow, y = Intensity), alpha = 0.05) + 
-  theme_bw() + ylab("Intensity per Fecal Sample")
-dev.off()
+# sampled_snow = data$Snow * covariate_scaled_attr$Scale[4] + covariate_scaled_attr$Center[4]
+# 
+# new_dat = with(data, data.frame(Northing = mean(Northing), Easting = mean(Easting),
+#                                                     Elevation = mean(Elevation),
+#                                                     Precipitation = mean(Precipitation),
+#                                                     Snow = seq(min(Snow), max(Snow), length = 1000),
+#                                                     Distance_to_wetland = mean(Distance_to_wetland)
+#                                                     ))
+# 
+# predicted_intensity = predict(top_model$`255`, newdata = new_dat, type = 'response')
+# 
+# plot_data = data.frame(Snow = with(data, seq(min(sampled_snow), max(sampled_snow), length = 1000)), `Predicted Intensity` = predicted_intensity)
+# 
+# plot_points = data.frame(Snow = sampled_snow,
+#                          Intensity = data$fmagna_ff)
+# 
+# Cairo::Cairo(file = 'images/snow_rel_fmagna.png', dpi = 150)
+# ggplot(plot_data) +
+#   geom_line(aes(x = Snow, y = predicted_intensity)) +
+#   geom_point(data = plot_points, aes(x = Snow, y = Intensity), alpha = 0.05) +
+#   theme_bw() + ylab("Intensity per Fecal Sample")
+# dev.off()
 
 # What's the relationship with Easting?
 
 sampled_easting = data$Easting * covariate_scaled_attr$Scale[1] + covariate_scaled_attr$Center[1]
 
-new_dat = with(data, data.frame(Northing = mean(Northing), Easting = seq(min(Easting), max(Easting), length = 1000), 
-                                                    Elevation = mean(Elevation),
-                                                    Precipitation = mean(Precipitation), 
-                                                    Snow = mean(Snow),
-                                                    Distance_to_wetland = mean(Distance_to_wetland)
-                                                    ))
+new_dat = with(
+  data,
+  data.frame(
+    Northing = mean(Northing),
+    Easting = seq(min(Easting), max(Easting), length = 1000),
+    Elevation = mean(Elevation),
+    Precipitation = mean(Precipitation),
+    Snow = mean(Snow),
+    Distance_to_wetland = mean(Distance_to_wetland),
+    Year = factor(2016)
+  )
+)
 
-predicted_intensity = predict(top_model$`255`, newdata = new_dat, type = 'response')
+predicted_intensity = predict(top_model, newdata = new_dat, type = 'response')
 
 plot_data = data.frame(Easting = with(data, seq(min(sampled_easting), max(sampled_easting), length = 1000)), `Predicted Intensity` = predicted_intensity)
 
@@ -249,9 +279,9 @@ plot_points = data.frame(Easting = sampled_easting,
                          Intensity = data$fmagna_ff)
 
 Cairo::Cairo(file = 'images/easting_rel_fmagna.png', dpi = 150)
-ggplot(plot_data) + 
-  geom_line(aes(x = Easting, y = predicted_intensity)) + 
-  geom_point(data = plot_points, aes(x = Easting, y = Intensity), alpha = 0.05) + 
+ggplot(plot_data) +
+  geom_line(aes(x = Easting, y = predicted_intensity)) +
+  geom_point(data = plot_points, aes(x = Easting, y = Intensity), alpha = 0.05) +
   theme_bw() + ylab("Intensity per Fecal Sample")
 dev.off()
 
@@ -263,10 +293,11 @@ new_dat = with(data, data.frame(Northing = seq(min(Northing), max(Northing), len
                                 Elevation = mean(Elevation),
                                 Precipitation = mean(Precipitation), 
                                 Snow = mean(Snow),
-                                Distance_to_wetland = mean(Distance_to_wetland)
+                                Distance_to_wetland = mean(Distance_to_wetland),
+                                Year = factor(2016)
 ))
 
-predicted_intensity = predict(top_model$`255`, newdata = new_dat, type = 'response')
+predicted_intensity = predict(top_model, newdata = new_dat, type = 'response')
 
 plot_data = data.frame(Northing = with(data, seq(min(sampled_northing), max(sampled_northing), length = 1000)), `Predicted Intensity` = predicted_intensity)
 
@@ -280,15 +311,4 @@ ggplot(plot_data) +
   theme_bw() + ylab("Intensity per Fecal Sample")
 dev.off()
 
-
-# Mean prediction
-
-new_dat = with(data, data.frame(Northing = mean(Northing), Easting = mean(Easting), 
-                                                    Elevation = mean(Elevation),
-                                                    Precipitation = mean(Precipitation), 
-                                                    Snow = mean(Snow),
-                                                    Distance_to_wetland = mean(Distance_to_wetland)
-                                                    ))
-
-predicted_intensity = predict(top_model$`255`, newdata = new_dat, type = 'response', se.fit = T)
 
