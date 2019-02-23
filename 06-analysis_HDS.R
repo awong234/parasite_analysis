@@ -48,11 +48,20 @@ load('model_combos_fmagna.Rdata')
 
 # Best model was Elevation^2, Northing, Precipitation^2, Snow.
 
-inla_mod = fmagna_ff ~ Easting + Elevation + I(Elevation^2) + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay
+inla_mod = fmagna_ff ~ Easting + Elevation + I(Elevation*Elevation) + Northing + Precipitation + I(Precipitation*Precipitation) + Snow + JulianDay
 
 inla_out = inla(formula = inla_mod, family = "nbinomial", data = data, control.compute = list(waic=TRUE))
 
 summary(inla_out) # All of the estimates are identical.
+
+# Try fitting same model with bru() -- yes!
+
+cmp_test = fmagna_ff ~ Easting + Elevation + ElevQuad(map = Elevation^2, model = 'linear') + Northing + Precipitation + PrecipQuad(map = Precipitation^2, model = 'linear') + Snow + JulianDay
+bru_out = bru(components = cmp_test, family = 'nbinomial', data = data)
+
+summary(bru_out)
+
+bru_out$summary.fixed$mean
 
 # Fit model with spatial random effect
 
