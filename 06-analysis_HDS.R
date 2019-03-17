@@ -206,12 +206,6 @@ temp = apply(X = temp, MARGIN = 1, FUN = function(x){x / scale}) %>% t %>% as.da
 predict_grid_scaled = predict_grid_complete
 predict_grid_scaled@data = temp
 
-# Add temporal effects -- just reference category  -------------
-
-predict_grid_scaled@data$Year = factor(2016)
-predict_grid_scaled@data$JulianDay = 0
-
-
 # Stack predict grid projection into inla stack --------------------
 
 predictor_A = inla.spde.make.A(adk_mesh, loc = predict_grid_scaled@coords)
@@ -227,8 +221,7 @@ stk_predictor = inla.stack(
       Elevation = predict_grid_scaled@data$Elevation,
       Northing = predict_grid_scaled@data$Northing,
       Precipitation = predict_grid_scaled@data$Precipitation,
-      Snow = predict_grid_scaled@data$Snow,
-      JulianDay = predict_grid_scaled@data$JulianDay
+      Snow = predict_grid_scaled@data$Snow
     )
   ),
   tag = 'pred'
@@ -238,7 +231,7 @@ stk_jp = inla.stack(stk, stk_predictor)
 
 # Run models -------------------
 
-# "Best" model from dredge.
+# Examples
 
 fmagna_spatial_mod = y ~ 0 + Intercept + Easting + Elevation + I(Elevation^2) + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay + f(i, model = spde)
 
@@ -282,96 +275,8 @@ ggplot(predict_grid_complete@data) +
   gg(adkbound) + coord_fixed(ratio = 1)
   # geom_raster(aes(x = Easting, y = Northing, fill = Elevation))
 
-# Test without elevation quadratic effect -------------------------------
 
-fmagna_spatial_mod = y ~ 0 + Intercept + Easting + Elevation + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay + f(i, model = spde)
-
-fmagna_spatial_out = inla(fmagna_spatial_mod, family = 'nbinomial', 
-                          control.compute = list(waic = TRUE),
-                          data = inla.stack.data(stk),
-                          control.predictor = list(A = inla.stack.A(stk))
-)
-
-summary(fmagna_spatial_out)
-
-# Predict on grid using posterior mode
-
-fmagna_spatial_out_md = inla(fmagna_spatial_mod, family = 'nbinomial',
-                             data = inla.stack.data(stk_jp),
-                             control.predictor = list(A = inla.stack.A(stk_jp),
-                                                      compute = TRUE,
-                                                      link = 1),
-                             quantiles = NULL,
-                             control.inla = list(strategy = 'gaussian'),
-                             control.results = list(return.marginals.random = F,
-                                                    return.marginals.predictor=F),
-                             control.mode = list(theta = fmagna_spatial_out$mode$theta, restart = F)
-)
-
-summary(fmagna_spatial_out_md)
-
-pred_index = inla.stack.index(stk_jp, tag = 'pred')$data
-pred_response = fmagna_spatial_out_md$summary.fitted.values$mean[pred_index]
-
-predict_grid_complete@data$INLA_pred_fmagna = pred_response
-
-summary(pred_response)
-
-outlier_index = pred_response > 1e20
-
-
-ggplot(predict_grid_complete@data) + 
-  geom_raster(aes(x = Easting, y = Northing, fill = INLA_pred_fmagna)) +
-  scale_fill_viridis(option = 'C', limits = c(0,100)) + 
-  gg(adkbound) + coord_fixed(ratio = 1)
-# geom_raster(aes(x = Easting, y = Northing, fill = Elevation))
-
-# Test without elevation effect -------------------------------
-
-
-fmagna_spatial_mod = y ~ 0 + Intercept + Easting + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay + f(i, model = spde)
-
-fmagna_spatial_out = inla(fmagna_spatial_mod, family = 'nbinomial', 
-                          control.compute = list(waic = TRUE),
-                          data = inla.stack.data(stk),
-                          control.predictor = list(A = inla.stack.A(stk))
-)
-
-summary(fmagna_spatial_out)
-
-# Predict on grid using posterior mode
-
-fmagna_spatial_out_md = inla(fmagna_spatial_mod, family = 'nbinomial',
-                             data = inla.stack.data(stk_jp),
-                             control.predictor = list(A = inla.stack.A(stk_jp),
-                                                      compute = TRUE,
-                                                      link = 1),
-                             quantiles = NULL,
-                             control.inla = list(strategy = 'gaussian'),
-                             control.results = list(return.marginals.random = F,
-                                                    return.marginals.predictor=F),
-                             control.mode = list(theta = fmagna_spatial_out$mode$theta, restart = F)
-)
-
-summary(fmagna_spatial_out_md)
-
-pred_index = inla.stack.index(stk_jp, tag = 'pred')$data
-pred_response = fmagna_spatial_out_md$summary.fitted.values$mean[pred_index]
-
-predict_grid_complete@data$INLA_pred_fmagna = pred_response
-
-summary(pred_response)
-
-outlier_index = pred_response > 1e20
-
-
-ggplot(predict_grid_complete@data) + 
-  geom_raster(aes(x = Easting, y = Northing, fill = INLA_pred_fmagna)) +
-  scale_fill_viridis(option = 'C') + 
-  gg(adkbound) + coord_fixed(ratio = 1)
-# geom_raster(aes(x = Easting, y = Northing, fill = Elevation))
-
-# Test with random walk elevation effect -------------------------------
+# Example with random walk elevation effect -------------------------------
 
 stk <- inla.stack(
   data = list(y = data$fmagna_ff),
@@ -532,13 +437,28 @@ distdf <- data.frame(distance = seq(0,8,length=100))
 dfun <- predict(fit, distdf, ~ hn(distance,lsig))
 plot(dfun)
 
-# Very cool ---- now how to add covariates??
+# Very cool ---- now combine the two simply -----------------------
 
+lik_parasite = like(family = 'nbinomial', 
+     formula = fmagna_ff ~ Easting + Elevation + I(Elevation^2) + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay, 
+     data = data)
 
+cmp_deer = scat_dens ~ mySPDE(map = coordinates, model = matern) + 
+  lsig + Intercept
 
+lik_deer = like(family = 'cp',
+                formula = coordinates + distance ~ mySPDE +
+                  log(hn(distance, lsig)) + 
+                  log(1/W) +
+                  Intercept, data = ds_data_sp,
+                components = cmp_deer,
+                samplers = deer_transects_2018)
 
+bru(cmp_deer, lik_deer)
 
+jcmp = fmagna_ff ~ Easting + Elevation + Northing + Precipitation + Snow + JulianDay + Intercept + coordinates + distance + mySPDE(map = coordinates, model = matern)
 
+test = bru(components = jcmp, lik_parasite, lik_deer)
 
 # Practice ---------------
 
