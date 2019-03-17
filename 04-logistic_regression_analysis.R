@@ -46,6 +46,7 @@ save(data, file = 'data_no_na.Rdata')
 my_bin <- function(data, mapping, ...) {
   ggplot(data = data, mapping = mapping) +
     geom_bin2d(...) +
+    geom_smooth(..., color = 'red') +
     viridis::scale_fill_viridis(option = "D") + 
     theme_bw() + 
     theme(axis.text = element_blank(),
@@ -60,7 +61,7 @@ center = function(data, mapping, ...) {
     theme(axis.text = element_blank())
 }
 
-pairs_plot = data %>% dplyr::select(JulianDay, Year, Easting, Northing, Precipitation:Elevation, fmagna_ff, dsl_mb) %>% 
+pairs_plot = data %>% dplyr::select(Easting, Northing, Precipitation:Elevation, fmagna_ff, dsl_mb) %>% 
   ggpairs(lower = list(continuous = my_bin), diag = list(continuous = center)) + theme(strip.text = element_text(size = 5))
 
 Cairo::Cairo(width = 1000, height = 1000, file = 'images/pairs_plot.png', dpi = 150)
