@@ -146,8 +146,7 @@ precip_names = dir(path = '../../GIS/PRISM_precip_data/', pattern = 'PRISM.+tif$
 precip_files = dir(path = '../../GIS/PRISM_precip_data/', pattern = 'PRISM.+tif$', full.names = T)
 
 
-precip_dates = data.frame(file = precip_names, year = precip_names %>% {regmatches(x = ., m = regexec(pattern = '\\d{4}', text = ., perl = T))} %>% as.integer,
-                          month = precip_names %>% {regmatches(x = ., m = regexec(text = ., pattern = '(?!\\d{3})\\d{2}', perl = T))} %>% as.integer)
+precip_dates = data.frame(file = precip_names, year = precip_names %>% {regmatches(x = ., m = regexec(pattern = '\\d{4}', text = ., perl = T))} %>% as.integer)
 
 precip_data = matrix(NA, nrow = NROW(predict_grid), ncol = length(precip_files))
 
