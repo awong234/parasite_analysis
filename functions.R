@@ -1,3 +1,213 @@
+# Analysis functions ------------
+
+
+inla_model_fn = function(data, 
+                         formulas, 
+                         prior.range = c(1000, 0.01), prior.sigma = c(1, 0.01), 
+                         par = FALSE, par_cores = 4,
+                         prediction){
+  
+  
+  # Classify models -- spde? rw?
+  browser()
+  rw_present = sapply(X = formulas, FUN = function(x){grepl(pattern = 'rw', x = x[3], perl = T)})
+  spde_present = sapply(X = formulas, FUN = function(x){grepl(pattern = 'spde', x = x[3], perl = T)})
+  
+  spde_rw =  rw_present &   spde_present
+  spde    = !rw_present &   spde_present
+  rw      =  rw_present &  !spde_present
+  clear   = !rw_present &  !spde_present
+  
+  bind_rows(spde_rw, spde, rw, clear)
+  
+  # Set up mesh, spde
+  
+  data_sp = data
+  coordinates(data_sp) = ~Easting_real + Northing_real
+  
+  # Look at variogram
+  # brk = seq(0, 10000, by = 1)
+  # vgram_out = fields::vgram(loc = data_sp@coords, y = data_sp@data$fmagna_ff, breaks = brk)
+  
+  # No evidence of spatial correlation.
+  # plot(vgram_out, breaks = seq(0,2000, length.out = 50))
+  
+  boundary <- list(
+    inla.nonconvex.hull(coordinates(data_sp), 10000),
+    inla.nonconvex.hull(coordinates(data_sp), 30000))
+  
+  
+  adk_mesh = inla.mesh.2d(boundary=boundary,
+                          max.edge=c(2000, 5400),
+                          min.angle=c(30, 21),
+                          max.n=c(48000, 16000), ## Safeguard against large meshes.
+                          max.n.strict=c(128000, 128000), ## Don't build a huge mesh!
+                          cutoff=1050, ## Filter away adjacent points.
+                          offset=c(5200, 15000)) ## Offset for extra boundaries, if needed.
+  
+  spde <- inla.spde2.pcmatern(
+    mesh = adk_mesh,
+    alpha = 2,
+    ### mesh and smoothness parameter
+    prior.range = prior.range,
+    ### P(practic.range<1000)=0.01 -- conservative, states that there is a very small chance that there is autocorrelation at ranges below 1000m. 
+    prior.sigma = prior.sigma
+    ### P(sigma>1)=0.01 -- conservative, states that there is a very small chance that the standard deviation is larger than 1.
+  ) 
+  
+  projector_A <- inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
+
+  
+  # Classify stacks for each situation ------------------------------------------------------------
+  {
+  # SPDE_RW 
+  
+  stk_spde_rw = inla.stack(
+    data = list(y = data$fmagna_ff),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = inla.group(data$Elevation, method = 'quantile', n = 30),
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        Distance_to_wetland = data$Distance_to_wetland
+      )
+    ),
+    tag = 'dat'
+  )
+    
+    
+  # Predictor stack
+  
+  predictor_A = inla.spde.make.A(adk_mesh, loc = prediction@coords) # Use predict_grid_scaled generated near the top of the HDS.R file
+  
+  stk_predictor_spde_rw = inla.stack(
+    data = list(y = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = prediction@data$Easting,
+        Elevation = inla.group(prediction$Elevation, method = 'quantile', n = 30),
+        Northing = prediction@data$Northing,
+        Precipitation = prediction@data$Precipitation,
+        Snow = prediction@data$Snow
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp_spde_rw = inla.stack(stk_spde_rw, stk_predictor_spde_rw)
+  
+  # SPDE
+  
+  stk_spde = inla.stack(
+    data = list(y = data$fmagna_ff),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = data$Elevation,
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        Distance_to_wetland = data$Distance_to_wetland
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  
+  predictor_A = inla.spde.make.A(adk_mesh, loc = prediction@coords) # Use predict_grid_scaled generated near the top of the HDS.R file
+  
+  stk_predictor_spde_rw = inla.stack(
+    data = list(y = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = prediction@data$Easting,
+        Elevation = prediction$Elevation,
+        Northing = prediction@data$Northing,
+        Precipitation = prediction@data$Precipitation,
+        Snow = prediction@data$Snow
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp_spde = inla.stack(stk_spde, stk_predictor_spde)
+  
+  # RW
+  
+  stk_rw = inla.stack(
+    data = list(y = data$fmagna_ff),
+    A = list(1),
+    effects = list(
+      list(data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = inla.group(data$Elevation, method = 'quantile', n = 30),
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        Distance_to_wetland = data$Distance_to_wetland
+      )
+      ),
+      tag = 'dat'
+    )
+  )
+  
+  
+  predictor_A = inla.spde.make.A(adk_mesh, loc = prediction@coords) # Use predict_grid_scaled generated near the top of the HDS.R file
+  
+  stk_predictor_rw = inla.stack(
+    data = list(y = NA),
+    A = list(1),
+    effects = list(
+      data.frame(
+        Intercept = 1,
+        Easting = prediction@data$Easting,
+        Elevation = inla.group(prediction$Elevation, method = 'quantile', n = 30),
+        Northing = prediction@data$Northing,
+        Precipitation = prediction@data$Precipitation,
+        Snow = prediction@data$Snow
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp_rw = inla.stack(stk_rw, stk_predictor_rw)
+  
+  }
+  
+  # Run through each model 
+  
+  if(par){doParallel::registerDoParallel(cores = par_cores)}
+  
+  foreach(i = 1:length(formulas)) %dopar% {
+    
+    
+    
+    mod_out = inla(formula = formula[[i]], 
+                   family  = 'nbinomial',
+                   data    = data,
+                   control.compute = list(waic=TRUE))
+    
+  }
+    
+}
+
+
+
 getAngle = function(start_pt, end_pt){
 
   # Obtain an angle from two points
