@@ -3,6 +3,7 @@
 
 library(INLA)
 library(inlabru)
+library(doParallel)
 library(magrittr)
 library(ggplot2)
 library(MASS)
@@ -362,7 +363,79 @@ ggplot(predict_grid_complete@data) +
   gg(adkbound) + coord_fixed(ratio = 1)
 # geom_raster(aes(x = Easting, y = Northing, fill = Elevation))
 
+
+# RW without spde
+projector_A <- inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
+
+stk <- inla.stack(
+  data = list(y = data$fmagna_ff),
+  A = list(1),
+  effects = list(
+    data.frame(
+      Intercept = 1,
+      Easting = data$Easting,
+      Elevation = inla.group(data$Elevation, method = 'quantile', n = 30),
+      Northing = data$Northing,
+      Precipitation = data$Precipitation,
+      Snow = data$Snow,
+      JulianDay = data$JulianDay
+    )
+  ),
+  tag = 'dat'
+)
+
+
+fmagna_spatial_mod = y ~ 0 + Intercept + Easting + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay + f(Elevation, model = "rw1")
+
+fmagna_spatial_out = inla(fmagna_spatial_mod, family = 'nbinomial', 
+                          control.compute = list(waic = TRUE),
+                          data = inla.stack.data(stk),
+                          control.predictor = list(A = inla.stack.A(stk))
+)
+
+summary(fmagna_spatial_out)
+
+
 # List all models to run and run them! -----------------------------------------
+
+f_magna_models = list()
+
+# Null model
+
+f_magna_models[['null_model']] = as.formula("fmagna_ff ~ 1")
+
+# Full model with spatial effect
+f_magna_models[['full_model']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation + f(i, model = spde)")
+
+# Full model with elevation random walk
+f_magna_models[['full_model_elev_rw']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1') + f(i, model = spde)")
+
+# Reduced models 
+
+# Remove spatial effect, all covariates and rw elevation
+f_magna_models[['red_mod_minus_speff']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1')")
+
+# Remove elevation rw; linear in all covariates
+f_magna_models[['red_mod_linear_all_cov']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation")
+
+# Survival hypothesis -- precip, snow, wetland
+f_magna_models[['red_mod_survival']] = as.formula("fmagna_ff ~ Precipitation + Snow + Distance_to_wetland")
+
+# No survival -- large-scale and small-scale spatial variation
+
+f_magna_models[['red_mod_spatial']] = as.formula("fmagna_ff ~ Easting + Northing + f(i, model = spde)")
+
+# No survival -- with linear elevation also
+
+f_magna_models[['red_mod_spatial_elev']] = as.formula("fmagna_ff ~ Easting + Northing + f(i, model = spde) + Elevation")
+
+################################################
+# MODEL RUNS ###################################
+################################################
+
+inla_model_fn(data = data, formulas = f_magna_models, par = F, prediction = predict_grid_scaled)
+
+# P tenuis models
 
 
 
