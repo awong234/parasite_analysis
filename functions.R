@@ -9,7 +9,7 @@ inla_model_fn = function(data,
   
   
   # Classify models -- spde? rw?
-  browser()
+  # browser()
   rw_present = sapply(X = formulas, FUN = function(x){grepl(pattern = 'rw', x = x[3], perl = T)})
   spde_present = sapply(X = formulas, FUN = function(x){grepl(pattern = 'spde', x = x[3], perl = T)})
   
@@ -18,8 +18,9 @@ inla_model_fn = function(data,
   rw      =  rw_present &  !spde_present
   clear   = !rw_present &  !spde_present
   
-  bind_rows(spde_rw, spde, rw, clear)
-  
+  model_class = bind_rows(spde_rw, spde, rw, clear)
+  model_class = apply(X = model_class, MARGIN = 2, FUN = function(x){which(x == 1)})
+  # browser()
   # Set up mesh, spde
   
   data_sp = data
@@ -57,10 +58,10 @@ inla_model_fn = function(data,
   
   projector_A <- inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
 
-  
+  browser()
   # Classify stacks for each situation ------------------------------------------------------------
   {
-  # SPDE_RW 
+  # SPDE_RW ---------------------------------------------------
   
   stk_spde_rw = inla.stack(
     data = list(y = data$fmagna_ff),
@@ -96,7 +97,8 @@ inla_model_fn = function(data,
         Elevation = inla.group(prediction$Elevation, method = 'quantile', n = 30),
         Northing = prediction@data$Northing,
         Precipitation = prediction@data$Precipitation,
-        Snow = prediction@data$Snow
+        Snow = prediction@data$Snow,
+        Distance_to_wetland = prediction@data$Distance_to_wetland
       )
     ),
     tag = 'pred'
@@ -104,7 +106,7 @@ inla_model_fn = function(data,
   
   stk_jp_spde_rw = inla.stack(stk_spde_rw, stk_predictor_spde_rw)
   
-  # SPDE
+  # SPDE ------------------------------------------------
   
   stk_spde = inla.stack(
     data = list(y = data$fmagna_ff),
@@ -127,7 +129,7 @@ inla_model_fn = function(data,
   
   predictor_A = inla.spde.make.A(adk_mesh, loc = prediction@coords) # Use predict_grid_scaled generated near the top of the HDS.R file
   
-  stk_predictor_spde_rw = inla.stack(
+  stk_predictor_spde = inla.stack(
     data = list(y = NA),
     A = list(predictor_A, 1),
     effects = list(
@@ -138,7 +140,9 @@ inla_model_fn = function(data,
         Elevation = prediction$Elevation,
         Northing = prediction@data$Northing,
         Precipitation = prediction@data$Precipitation,
-        Snow = prediction@data$Snow
+        Snow = prediction@data$Snow,
+        Distance_to_wetland = prediction@data$Distance_to_wetland
+        
       )
     ),
     tag = 'pred'
@@ -146,7 +150,7 @@ inla_model_fn = function(data,
   
   stk_jp_spde = inla.stack(stk_spde, stk_predictor_spde)
   
-  # RW
+  # RW ----------------------------------------------------
   
   stk_rw = inla.stack(
     data = list(y = data$fmagna_ff),
@@ -179,7 +183,9 @@ inla_model_fn = function(data,
         Elevation = inla.group(prediction$Elevation, method = 'quantile', n = 30),
         Northing = prediction@data$Northing,
         Precipitation = prediction@data$Precipitation,
-        Snow = prediction@data$Snow
+        Snow = prediction@data$Snow,
+        Distance_to_wetland = prediction@data$Distance_to_wetland
+        
       )
     ),
     tag = 'pred'
@@ -189,21 +195,47 @@ inla_model_fn = function(data,
   
   }
   
-  # Run through each model 
+  # Run through each model. 
+  # Recall model_class construction   
+  # 1 spde_rw =  rw_present &   spde_present
+  # 2 spde    = !rw_present &   spde_present
+  # 3 rw      =  rw_present &  !spde_present
+  # 4 clear   = !rw_present &  !spde_present
   
-  if(par){doParallel::registerDoParallel(cores = par_cores)}
+  # Stacks available are
+  # stk_jp_spde_rw
+  # stk_jp_spde
+  # stk_jp_rw
+  # none
   
-  foreach(i = 1:length(formulas)) %dopar% {
+  for(i in 1:length(formulas)){
+    browser()
     
+    type = model_class[i] %>% as.character()
     
+    stack_object = switch(type,
+                          "1" = stk_jp_spde_rw,
+                          "2" = stk_jp_spde,
+                          "3" = stk_jp_rw,
+                          "4" = NULL)
     
-    mod_out = inla(formula = formula[[i]], 
-                   family  = 'nbinomial',
-                   data    = data,
-                   control.compute = list(waic=TRUE))
+    str(stack_object)
     
   }
-    
+#   
+#   if(par){doParallel::registerDoParallel(cores = par_cores)}
+#   
+#   foreach(i = 1:length(formulas)) %dopar% {
+#     
+#     
+#     
+#     mod_out = inla(formula = formula[[i]], 
+#                    family  = 'nbinomial',
+#                    data    = data,
+#                    control.compute = list(waic=TRUE))
+#     
+#   }
+#     
 }
 
 
