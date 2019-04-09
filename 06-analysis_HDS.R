@@ -8,7 +8,7 @@ library(magrittr)
 library(ggplot2)
 library(MASS)
 library(GGally)
-library(MuMIn)
+library(MuMIn) 
 library(viridis)
 library(dplyr)
 
@@ -40,47 +40,9 @@ data %<>% mutate(JulianDay = lubridate::yday(Date) %>% scale())
 
 data = data[complete.cases(data %>% select(fmagna_ff, dsl_mb, Easting:JulianDay)),]
 
-# Load maxlik outputs ------------------------------------------------------------------------------------------------------------
-
-load('model_combos_dsl.Rdata')
-load('model_combos_fmagna.Rdata')
-
-# Fit INLA model same effects as last ---------------------------------------
-
-# Best model was Elevation^2, Northing, Precipitation^2, Snow.
-
-inla_mod = fmagna_ff ~ Easting + Elevation + I(Elevation*Elevation) + Northing + Precipitation + I(Precipitation*Precipitation) + Snow + JulianDay
-
-inla_out = inla(formula = inla_mod, family = "nbinomial", data = data, control.compute = list(waic=TRUE))
-
-summary(inla_out) # All of the estimates are identical.
-
-# Try fitting same model with bru() -- yes!
-
-cmp_test = fmagna_ff ~ Easting + Elevation + ElevQuad(map = Elevation^2, model = 'linear') + Northing + Precipitation + PrecipQuad(map = Precipitation^2, model = 'linear') + Snow + JulianDay
-bru_out = bru(components = cmp_test, family = 'nbinomial', data = data)
-
-summary(bru_out)
-
-bru_out$summary.fixed$mean
-
-# Fit model with spatial random effect
-
 # Create mesh
 
 adkbound = rgdal::readOGR(dsn = '../../GIS/adkParkPoly/adkParkPoly.shp')
-
-# Data points as sp
-
-data_sp = data
-coordinates(data_sp) = ~Easting_real + Northing_real
-
-# Look at variogram
-# brk = seq(0, 10000, by = 1)
-# vgram_out = fields::vgram(loc = data_sp@coords, y = data_sp@data$fmagna_ff, breaks = brk)
-
-# No evidence of spatial correlation.
-# plot(vgram_out, breaks = seq(0,2000, length.out = 50))
 
 boundary <- list(
   inla.nonconvex.hull(coordinates(data_sp), 10000),
@@ -101,35 +63,11 @@ ggplot() +
   gg(adkbound) +
   coord_fixed(ratio = 1)
 
-spde <- inla.spde2.pcmatern(
-  mesh = adk_mesh,
-  alpha = 2,
-  ### mesh and smoothness parameter
-  prior.range = c(1000, 0.01),
-  ### P(practic.range<0.3)=0.5
-  prior.sigma = c(1, 0.01)
-  ### P(sigma>1)=0.01
-) 
+# Data points as sp
 
-projector_A <- inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
+data_sp = data
+coordinates(data_sp) = ~Easting_real + Northing_real
 
-stk <- inla.stack(
-  data = list(y = data$fmagna_ff),
-  A = list(projector_A, 1),
-  effects = list(
-    list(i = 1:spde$n.spde),
-    data.frame(
-      Intercept = 1,
-      Easting = data$Easting,
-      Elevation = data$Elevation,
-      Northing = data$Northing,
-      Precipitation = data$Precipitation,
-      Snow = data$Snow,
-      JulianDay = data$JulianDay
-    )
-  ),
-  tag = 'dat'
-)
 
 # Load prediction grid --------------------------------------------------------------
 
@@ -206,6 +144,71 @@ temp = apply(X = temp, MARGIN = 1, FUN = function(x){x / scale}) %>% t %>% as.da
 
 predict_grid_scaled = predict_grid_complete
 predict_grid_scaled@data = temp
+
+
+# Load maxlik outputs ------------------------------------------------------------------------------------------------------------
+
+load('model_combos_dsl.Rdata')
+load('model_combos_fmagna.Rdata')
+
+# Fit INLA model same effects as last ---------------------------------------
+
+# Best model was Elevation^2, Northing, Precipitation^2, Snow.
+
+inla_mod = fmagna_ff ~ Easting + Elevation + I(Elevation*Elevation) + Northing + Precipitation + I(Precipitation*Precipitation) + Snow + JulianDay
+
+inla_out = inla(formula = inla_mod, family = "nbinomial", data = data, control.compute = list(waic=TRUE))
+
+summary(inla_out) # All of the estimates are identical.
+
+# Try fitting same model with bru() -- yes!
+
+cmp_test = fmagna_ff ~ Easting + Elevation + ElevQuad(map = Elevation^2, model = 'linear') + Northing + Precipitation + PrecipQuad(map = Precipitation^2, model = 'linear') + Snow + JulianDay
+bru_out = bru(components = cmp_test, family = 'nbinomial', data = data)
+
+summary(bru_out)
+
+bru_out$summary.fixed$mean
+
+# Fit model with spatial random effect
+
+# Look at variogram
+# brk = seq(0, 10000, by = 1)
+# vgram_out = fields::vgram(loc = data_sp@coords, y = data_sp@data$fmagna_ff, breaks = brk)
+
+# No evidence of spatial correlation.
+# plot(vgram_out, breaks = seq(0,2000, length.out = 50))
+
+
+spde <- inla.spde2.pcmatern(
+  mesh = adk_mesh,
+  alpha = 2,
+  ### mesh and smoothness parameter
+  prior.range = c(1000, 0.01),
+  ### P(practic.range<0.3)=0.5
+  prior.sigma = c(1, 0.01)
+  ### P(sigma>1)=0.01
+) 
+
+projector_A <- inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
+
+stk <- inla.stack(
+  data = list(y = data$fmagna_ff),
+  A = list(projector_A, 1),
+  effects = list(
+    list(i = 1:spde$n.spde),
+    data.frame(
+      Intercept = 1,
+      Easting = data$Easting,
+      Elevation = data$Elevation,
+      Northing = data$Northing,
+      Precipitation = data$Precipitation,
+      Snow = data$Snow,
+      JulianDay = data$JulianDay
+    )
+  ),
+  tag = 'dat'
+)
 
 # Stack predict grid projection into inla stack --------------------
 
@@ -429,11 +432,181 @@ f_magna_models[['red_mod_spatial']] = as.formula("fmagna_ff ~ Easting + Northing
 
 f_magna_models[['red_mod_spatial_elev']] = as.formula("fmagna_ff ~ Easting + Northing + f(i, model = spde) + Elevation")
 
-################################################
+#'###############################################
 # MODEL RUNS ###################################
-################################################
+#'###############################################
+#
+# 
 
-inla_model_fn(data = data, formulas = f_magna_models, par = F, prediction = predict_grid_scaled)
+# Make the A matrices and spde for all subsequent stacks
+boundary <- list(
+inla.nonconvex.hull(coordinates(data_sp), 10000),
+inla.nonconvex.hull(coordinates(data_sp), 30000))
+
+
+adk_mesh = inla.mesh.2d(boundary=boundary,
+                        max.edge=c(2000, 5400),
+                        min.angle=c(30, 21),
+                        max.n=c(48000, 16000), ## Safeguard against large meshes.
+                        max.n.strict=c(128000, 128000), ## Don't build a huge mesh!
+                        cutoff=1050, ## Filter away adjacent points.
+                        offset=c(5200, 15000)) ## Offset for extra boundaries, if needed.
+
+projector_A <- inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
+predictor_A = inla.spde.make.A(adk_mesh, loc = predict_grid_scaled@coords)
+
+
+spde <- inla.spde2.pcmatern(
+  mesh = adk_mesh,
+  alpha = 2,
+  ### mesh and smoothness parameter
+  prior.range = c(1000, 0.01),
+  ### P(practic.range<0.3)=0.5
+  prior.sigma = c(1, 0.01)
+  ### P(sigma>1)=0.01
+) 
+
+
+# Null model -------------------------------
+
+null_model = inla(formula = f_magna_models$null_model, family = 'nbinomial', data = data, control.compute = list(waic = TRUE))
+
+null_model_ls = list(
+  "data_stack" = NA,
+  "join_stack" = NA,
+  "model"      = null_model
+)
+
+save(null_model_ls, file = "model_outputs/null_model.Rdata")
+
+# Full model with spatial effect -------------------------------
+
+# Set up stacks
+{
+ 
+  
+  # ggplot() +
+  #   gg(data_sp) +
+  #   gg(adk_mesh) +
+  #   gg(adkbound) +
+  #   coord_fixed(ratio = 1)
+  
+  
+  stk <- inla.stack(
+    data = list(fmagna_ff = data$fmagna_ff),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = data$Elevation,
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        Distance_to_wetland = data$Distance_to_wetland
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(fmagna_ff = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Elevation = predict_grid_scaled@data$Elevation,
+        Northing = predict_grid_scaled@data$Northing,
+        Precipitation = predict_grid_scaled@data$Precipitation,
+        Snow = predict_grid_scaled@data$Snow,
+        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+full_model = inla(formula = f_magna_models$full_model, 
+                  family = 'nbinomial', 
+                  data = inla.stack.data(stk), 
+                  control.compute = list(waic = TRUE),
+                  control.predictor = list(A = inla.stack.A(stk))
+                  )
+
+full_model_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = full_model
+)
+
+save(full_model_ls, file = "model_outputs/full_model.Rdata")
+
+# Full model with elevation random walk -----------------------------------------------
+
+# Set up stack -- 
+
+{
+  stk <- inla.stack(
+    data = list(fmagna_ff = data$fmagna_ff),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = inla.group(data$Elevation, method = 'quantile', n = 30),
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        Distance_to_wetland = data$Distance_to_wetland
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(fmagna_ff = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Elevation = inla.group(predict_grid_scaled$Elevation, method = 'quantile', n = 30),
+        Northing = predict_grid_scaled@data$Northing,
+        Precipitation = predict_grid_scaled@data$Precipitation,
+        Snow = predict_grid_scaled@data$Snow,
+        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+full_model_elev_rw = inla(formula = f_magna_models$full_model_elev_rw, 
+                          family = 'nbinomial', 
+                          data = inla.stack.data(stk), 
+                          control.compute = list(waic = TRUE),
+                          control.predictor = list(A = inla.stack.A(stk))
+)
+
+full_model_elev_rw_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk,
+  "model"      = full_model_elev_rw
+)
+
+save(full_model_elev_rw_ls, file = "full_model_elev_rw_ls.Rdata")
+
 
 # P tenuis models
 
