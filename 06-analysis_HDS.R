@@ -57,11 +57,11 @@ adk_mesh = inla.mesh.2d(boundary=boundary,
                         cutoff=1050, ## Filter away adjacent points.
                         offset=c(5200, 15000)) ## Offset for extra boundaries, if needed.
 
-ggplot() +
-  gg(data_sp) +
-  gg(adk_mesh) +
-  gg(adkbound) +
-  coord_fixed(ratio = 1)
+# ggplot() +
+#   gg(data_sp) +
+#   gg(adk_mesh) +
+#   gg(adkbound) +
+#   coord_fixed(ratio = 1)
 
 # Data points as sp
 
@@ -452,7 +452,7 @@ adk_mesh = inla.mesh.2d(boundary=boundary,
                         cutoff=1050, ## Filter away adjacent points.
                         offset=c(5200, 15000)) ## Offset for extra boundaries, if needed.
 
-projector_A <- inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
+projector_A = inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
 predictor_A = inla.spde.make.A(adk_mesh, loc = predict_grid_scaled@coords)
 
 
@@ -601,12 +601,213 @@ full_model_elev_rw = inla(formula = f_magna_models$full_model_elev_rw,
 
 full_model_elev_rw_ls = list(
   "data_stack" = stk,
-  "joint_stack" = stk,
+  "joint_stack" = stk_jp,
   "model"      = full_model_elev_rw
 )
 
-save(full_model_elev_rw_ls, file = "full_model_elev_rw_ls.Rdata")
+save(full_model_elev_rw_ls, file = "model_outputs/full_model_elev_rw_ls.Rdata")
 
+# Reduced: Remove spatial effect, all covariates and rw elevation --------------
+
+# set up stacks
+{
+  stk <- inla.stack(
+    data = list(fmagna_ff = data$fmagna_ff),
+    A = list(1),
+    effects = list(
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = inla.group(data$Elevation, method = 'quantile', n = 30),
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        Distance_to_wetland = data$Distance_to_wetland
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(fmagna_ff = NA),
+    A = list(1),
+    effects = list(
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Elevation = inla.group(predict_grid_scaled$Elevation, method = 'quantile', n = 30),
+        Northing = predict_grid_scaled@data$Northing,
+        Precipitation = predict_grid_scaled@data$Precipitation,
+        Snow = predict_grid_scaled@data$Snow,
+        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+  
+}
+
+red_mod_minus_speff = inla(formula = f_magna_models$red_mod_minus_speff, 
+                          family = 'nbinomial', 
+                          data = inla.stack.data(stk), 
+                          control.compute = list(waic = TRUE),
+                          control.predictor = list(A = inla.stack.A(stk))
+)
+
+red_mod_minus_speff_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model"      = red_mod_minus_speff
+)
+
+save(red_mod_minus_speff_ls, file = "model_outputs/red_mod_minus_speff_ls.Rdata")
+
+
+# Reduced: Remove elevation rw; linear in all covariates ------------------
+
+# No stacks necessary
+
+red_mod_linear_all_cov = inla(formula = f_magna_models$red_mod_linear_all_cov,
+                              family = 'nbinomial',
+                              data = data,
+                              control.compute = list(waic = TRUE)
+                              )
+
+red_mod_linear_all_cov_ls = list(
+  "data_stack" = NA,
+  "join_stack" = NA,
+  "model"      = red_mod_linear_all_cov
+)
+
+save(red_mod_linear_all_cov_ls, file = 'model_outputs/red_mod_linear_all_cov_ls.Rdata')
+
+
+# Reduced: Survival hypothesis -- precip, snow, wetland -------------------
+
+red_mod_survival = inla(formula = f_magna_models$red_mod_survival,
+                              family = 'nbinomial',
+                              data = data,
+                              control.compute = list(waic = TRUE)
+)
+
+red_mod_survival_ls = list(
+  "data_stack" = NA,
+  "join_stack" = NA,
+  "model"      = red_mod_survival
+)
+
+save(red_mod_survival_ls, file = 'model_outputs/red_mod_survival_ls.Rdata')
+
+
+# Reduced: no survival -- large-scale and small-scale spatial vari --------
+
+# Set up stacks
+{
+  
+  stk <- inla.stack(
+    data = list(fmagna_ff = data$fmagna_ff),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Northing = data$Northing
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(fmagna_ff = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Northing = predict_grid_scaled@data$Northing
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+red_mod_spatial = inla(formula = f_magna_models$red_mod_spatial, 
+                  family = 'nbinomial', 
+                  data = inla.stack.data(stk), 
+                  control.compute = list(waic = TRUE),
+                  control.predictor = list(A = inla.stack.A(stk))
+)
+
+red_mod_spatial_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = red_mod_spatial
+)
+
+save(red_mod_spatial_ls, file = "model_outputs/red_mod_spatial.Rdata")
+
+
+# Reduced: No survival -- with linear elevation also ----------------------
+
+# Set up stacks
+{
+  
+  stk <- inla.stack(
+    data = list(fmagna_ff = data$fmagna_ff),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Northing = data$Northing,
+        Elevation = data$Elevation
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(fmagna_ff = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Northing = predict_grid_scaled@data$Northing,
+        Elevation = predict_grid_scaled@data$Elevation
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+red_mod_spatial_elev_elev = inla(formula = f_magna_models$red_mod_spatial_elev_elev, 
+                       family = 'nbinomial', 
+                       data = inla.stack.data(stk), 
+                       control.compute = list(waic = TRUE),
+                       control.predictor = list(A = inla.stack.A(stk))
+)
+
+red_mod_spatial_elev_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = red_mod_spatial_elev
+)
+
+save(red_mod_spatial_elev_ls, file = "model_outputs/red_mod_spatial_elev.Rdata")
 
 # P tenuis models
 
