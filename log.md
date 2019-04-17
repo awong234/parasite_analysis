@@ -1,3 +1,14 @@
+# 4-17-2019
+
+Model runs for parasite completed; moving on to hds with covariates.
+
+# January - April
+
+Mostly job applications getting in the way of completing the project. Worked on
+it here and there. Lots of difficulty finding inlabru syntax to model parasite
+intensity as a function of scat density, which itself is modeled under
+hierarchical distance sampling.
+
 # 12-21-2018
 
 Downloaded PRISM data and NYS data.
