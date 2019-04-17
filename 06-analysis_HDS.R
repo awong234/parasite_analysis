@@ -40,6 +40,11 @@ data %<>% mutate(JulianDay = lubridate::yday(Date) %>% scale())
 
 data = data[complete.cases(data %>% select(fmagna_ff, dsl_mb, Easting:JulianDay)),]
 
+# Data points as sp
+
+data_sp = data
+coordinates(data_sp) = ~Easting_real + Northing_real
+
 # Create mesh
 
 adkbound = rgdal::readOGR(dsn = '../../GIS/adkParkPoly/adkParkPoly.shp')
@@ -63,10 +68,6 @@ adk_mesh = inla.mesh.2d(boundary=boundary,
 #   gg(adkbound) +
 #   coord_fixed(ratio = 1)
 
-# Data points as sp
-
-data_sp = data
-coordinates(data_sp) = ~Easting_real + Northing_real
 
 
 # Load prediction grid --------------------------------------------------------------
@@ -144,259 +145,6 @@ temp = apply(X = temp, MARGIN = 1, FUN = function(x){x / scale}) %>% t %>% as.da
 
 predict_grid_scaled = predict_grid_complete
 predict_grid_scaled@data = temp
-
-
-# Load maxlik outputs ------------------------------------------------------------------------------------------------------------
-
-load('model_combos_dsl.Rdata')
-load('model_combos_fmagna.Rdata')
-
-# Fit INLA model same effects as last ---------------------------------------
-
-# Best model was Elevation^2, Northing, Precipitation^2, Snow.
-
-inla_mod = fmagna_ff ~ Easting + Elevation + I(Elevation*Elevation) + Northing + Precipitation + I(Precipitation*Precipitation) + Snow + JulianDay
-
-inla_out = inla(formula = inla_mod, family = "nbinomial", data = data, control.compute = list(waic=TRUE))
-
-summary(inla_out) # All of the estimates are identical.
-
-# Try fitting same model with bru() -- yes!
-
-cmp_test = fmagna_ff ~ Easting + Elevation + ElevQuad(map = Elevation^2, model = 'linear') + Northing + Precipitation + PrecipQuad(map = Precipitation^2, model = 'linear') + Snow + JulianDay
-bru_out = bru(components = cmp_test, family = 'nbinomial', data = data)
-
-summary(bru_out)
-
-bru_out$summary.fixed$mean
-
-# Fit model with spatial random effect
-
-# Look at variogram
-# brk = seq(0, 10000, by = 1)
-# vgram_out = fields::vgram(loc = data_sp@coords, y = data_sp@data$fmagna_ff, breaks = brk)
-
-# No evidence of spatial correlation.
-# plot(vgram_out, breaks = seq(0,2000, length.out = 50))
-
-
-spde <- inla.spde2.pcmatern(
-  mesh = adk_mesh,
-  alpha = 2,
-  ### mesh and smoothness parameter
-  prior.range = c(1000, 0.01),
-  ### P(practic.range<0.3)=0.5
-  prior.sigma = c(1, 0.01)
-  ### P(sigma>1)=0.01
-) 
-
-projector_A <- inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
-
-stk <- inla.stack(
-  data = list(y = data$fmagna_ff),
-  A = list(projector_A, 1),
-  effects = list(
-    list(i = 1:spde$n.spde),
-    data.frame(
-      Intercept = 1,
-      Easting = data$Easting,
-      Elevation = data$Elevation,
-      Northing = data$Northing,
-      Precipitation = data$Precipitation,
-      Snow = data$Snow,
-      JulianDay = data$JulianDay
-    )
-  ),
-  tag = 'dat'
-)
-
-# Stack predict grid projection into inla stack --------------------
-
-predictor_A = inla.spde.make.A(adk_mesh, loc = predict_grid_scaled@coords)
-
-stk_predictor = inla.stack(
-  data = list(y = NA),
-  A = list(predictor_A, 1),
-  effects = list(
-    list(i = 1:spde$n.spde),
-    data.frame(
-      Intercept = 1,
-      Easting = predict_grid_scaled@data$Easting,
-      Elevation = predict_grid_scaled@data$Elevation,
-      Northing = predict_grid_scaled@data$Northing,
-      Precipitation = predict_grid_scaled@data$Precipitation,
-      Snow = predict_grid_scaled@data$Snow
-    )
-  ),
-  tag = 'pred'
-)
-
-stk_jp = inla.stack(stk, stk_predictor)
-
-# Run models -------------------
-
-# Examples
-
-fmagna_spatial_mod = y ~ 0 + Intercept + Easting + Elevation + I(Elevation^2) + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay + f(i, model = spde)
-
-fmagna_spatial_out = inla(fmagna_spatial_mod, family = 'nbinomial', 
-                          control.compute = list(waic = TRUE),
-                          data = inla.stack.data(stk),
-                          control.predictor = list(A = inla.stack.A(stk))
-                          )
-
-summary(fmagna_spatial_out)
-
-# Predict on grid using posterior mode
-
-fmagna_spatial_out_md = inla(fmagna_spatial_mod, family = 'nbinomial',
-                             data = inla.stack.data(stk_jp),
-                             control.predictor = list(A = inla.stack.A(stk_jp),
-                                                      compute = TRUE,
-                                                      link = 1),
-                             quantiles = NULL,
-                             control.inla = list(strategy = 'gaussian'),
-                             control.results = list(return.marginals.random = F,
-                                                    return.marginals.predictor=F),
-                             control.mode = list(theta = fmagna_spatial_out$mode$theta, restart = F)
-)
-
-summary(fmagna_spatial_out_md)
-
-pred_index = inla.stack.index(stk_jp, tag = 'pred')$data
-pred_response = fmagna_spatial_out_md$summary.fitted.values$mean[pred_index]
-
-predict_grid_complete@data$INLA_pred_fmagna = pred_response
-
-summary(pred_response)
-
-outlier_index = pred_response > 1e20
-
-
-ggplot(predict_grid_complete@data) + 
-  geom_raster(aes(x = Easting, y = Northing, fill = INLA_pred_fmagna)) +
-  scale_fill_viridis(option = 'C', limits = c(0,1000)) + 
-  gg(adkbound) + coord_fixed(ratio = 1)
-  # geom_raster(aes(x = Easting, y = Northing, fill = Elevation))
-
-
-# Example with random walk elevation effect -------------------------------
-
-stk <- inla.stack(
-  data = list(y = data$fmagna_ff),
-  A = list(projector_A, 1),
-  effects = list(
-    list(i = 1:spde$n.spde),
-    data.frame(
-      Intercept = 1,
-      Easting = data$Easting,
-      Elevation = inla.group(data$Elevation, method = 'quantile', n = 30),
-      Northing = data$Northing,
-      Precipitation = data$Precipitation,
-      Snow = data$Snow,
-      JulianDay = data$JulianDay
-    )
-  ),
-  tag = 'dat'
-)
-
-
-fmagna_spatial_mod = y ~ 0 + Intercept + Easting + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay + f(i, model = spde) + f(Elevation, model = "rw1")
-
-fmagna_spatial_out = inla(fmagna_spatial_mod, family = 'nbinomial', 
-                          control.compute = list(waic = TRUE),
-                          data = inla.stack.data(stk),
-                          control.predictor = list(A = inla.stack.A(stk))
-)
-
-summary(fmagna_spatial_out)
-
-
-# Predict on grid using posterior mode
-
-stk_predictor = inla.stack(
-  data = list(y = NA),
-  A = list(predictor_A, 1),
-  effects = list(
-    list(i = 1:spde$n.spde),
-    data.frame(
-      Intercept = 1,
-      Easting = predict_grid_scaled@data$Easting,
-      Elevation = inla.group(predict_grid_scaled$Elevation, method = 'quantile', n = 30),
-      Northing = predict_grid_scaled@data$Northing,
-      Precipitation = predict_grid_scaled@data$Precipitation,
-      Snow = predict_grid_scaled@data$Snow,
-      JulianDay = predict_grid_scaled@data$JulianDay
-    )
-  ),
-  tag = 'pred'
-)
-
-stk_jp = inla.stack(stk, stk_predictor)
-
-fmagna_spatial_out_md = inla(fmagna_spatial_mod, family = 'nbinomial',
-                             data = inla.stack.data(stk_jp),
-                             control.predictor = list(A = inla.stack.A(stk_jp),
-                                                      compute = TRUE,
-                                                      link = 1),
-                             quantiles = NULL,
-                             control.inla = list(strategy = 'gaussian'),
-                             control.results = list(return.marginals.random = F,
-                                                    return.marginals.predictor=F),
-                             control.mode = list(theta = fmagna_spatial_out$mode$theta, restart = F)
-)
-
-summary(fmagna_spatial_out_md)
-
-pred_index = inla.stack.index(stk_jp, tag = 'pred')$data
-pred_response = fmagna_spatial_out_md$summary.fitted.values$mean[pred_index]
-pred_sd = fmagna_spatial_out_md$summary.fitted.values$sd[pred_index]
-
-predict_grid_complete@data$INLA_pred_fmagna = pred_response
-predict_grid_complete@data$INLA_sd = pred_sd
-
-summary(pred_response)
-
-outlier_index = pred_response > 1e20
-
-
-ggplot(predict_grid_complete@data) + 
-  geom_raster(aes(x = Easting, y = Northing, fill = INLA_pred_fmagna)) +
-  scale_fill_viridis(option = 'C') + 
-  gg(adkbound) + coord_fixed(ratio = 1)
-# geom_raster(aes(x = Easting, y = Northing, fill = Elevation))
-
-
-# RW without spde
-projector_A <- inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
-
-stk <- inla.stack(
-  data = list(y = data$fmagna_ff),
-  A = list(1),
-  effects = list(
-    data.frame(
-      Intercept = 1,
-      Easting = data$Easting,
-      Elevation = inla.group(data$Elevation, method = 'quantile', n = 30),
-      Northing = data$Northing,
-      Precipitation = data$Precipitation,
-      Snow = data$Snow,
-      JulianDay = data$JulianDay
-    )
-  ),
-  tag = 'dat'
-)
-
-
-fmagna_spatial_mod = y ~ 0 + Intercept + Easting + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay + f(Elevation, model = "rw1")
-
-fmagna_spatial_out = inla(fmagna_spatial_mod, family = 'nbinomial', 
-                          control.compute = list(waic = TRUE),
-                          data = inla.stack.data(stk),
-                          control.predictor = list(A = inla.stack.A(stk))
-)
-
-summary(fmagna_spatial_out)
 
 
 # List all models to run and run them! -----------------------------------------
@@ -809,9 +557,412 @@ red_mod_spatial_elev_ls = list(
 
 save(red_mod_spatial_elev_ls, file = "model_outputs/red_mod_spatial_elev.Rdata")
 
-# P tenuis models
+# Summaries f magna -------------------------------------
+
+m_out = list.files('model_outputs/', full.names = T)
+
+for(m in m_out){
+  load(m)
+}
+
+mod_list = list(
+  'null_model_ls'             = null_model_ls,
+  'full_model_ls'             = full_model_ls,
+  'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
+  'red_mod_spatial_ls'        = red_mod_spatial_ls,
+  'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
+  'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
+  'red_mod_survival_ls'       = red_mod_survival_ls
+)
 
 
+
+aicFunc = function(model_ls){
+  
+  item = model_ls[[3]]
+  
+  waic = item$waic$`waic`
+  
+}
+
+aic_vals = sapply(mod_list, aicFunc)
+
+aic_df = data.frame("model" = names(mod_list), "waic" = aic_vals)
+
+aic_df %>% arrange(waic)
+
+# P tenuis models -----------------------------------------------
+
+p_tenuis_models = list()
+
+# Null model
+
+p_tenuis_models[['null_model']] = as.formula("dsl_mb ~ 1")
+
+# Full model with spatial effect
+p_tenuis_models[['full_model']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation + f(i, model = spde)")
+
+# Full model with elevation random walk
+p_tenuis_models[['full_model_elev_rw']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1') + f(i, model = spde)")
+
+# Reduced models 
+
+# Remove spatial effect, all covariates and rw elevation
+p_tenuis_models[['red_mod_minus_speff']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1')")
+
+# Remove elevation rw; linear in all covariates
+p_tenuis_models[['red_mod_linear_all_cov']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation")
+
+# Survival hypothesis -- precip, snow, wetland
+p_tenuis_models[['red_mod_survival']] = as.formula("dsl_mb ~ Precipitation + Snow + Distance_to_wetland")
+
+# No survival -- large-scale and small-scale spatial variation
+
+p_tenuis_models[['red_mod_spatial']] = as.formula("dsl_mb ~ Easting + Northing + f(i, model = spde)")
+
+# No survival -- with linear elevation also
+
+p_tenuis_models[['red_mod_spatial_elev']] = as.formula("dsl_mb ~ Easting + Northing + f(i, model = spde) + Elevation")
+
+# P tenuis Null model -------------------------------
+
+null_model = inla(formula = p_tenuis_models$null_model, family = 'nbinomial', data = data, control.compute = list(waic = TRUE))
+
+null_model_ls = list(
+  "data_stack" = NA,
+  "joint_stack" = NA,
+  "model"      = null_model
+)
+
+save(null_model_ls, file = "model_outputs/ptenuis/null_model.Rdata")
+
+# P tenuis Full model with spatial effect -------------------------------
+
+# Set up stacks
+{
+  
+  
+  # ggplot() +
+  #   gg(data_sp) +
+  #   gg(adk_mesh) +
+  #   gg(adkbound) +
+  #   coord_fixed(ratio = 1)
+  
+  
+  stk <- inla.stack(
+    data = list(dsl_mb = data$dsl_mb),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = data$Elevation,
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        Distance_to_wetland = data$Distance_to_wetland
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(dsl_mb = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Elevation = predict_grid_scaled@data$Elevation,
+        Northing = predict_grid_scaled@data$Northing,
+        Precipitation = predict_grid_scaled@data$Precipitation,
+        Snow = predict_grid_scaled@data$Snow,
+        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+full_model = inla(formula = p_tenuis_models$full_model, 
+                  family = 'nbinomial', 
+                  data = inla.stack.data(stk), 
+                  control.compute = list(waic = TRUE),
+                  control.predictor = list(A = inla.stack.A(stk))
+)
+
+full_model_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = full_model
+)
+
+save(full_model_ls, file = "model_outputs/ptenuis/full_model.Rdata")
+
+# P tenuis Full model with elevation random walk -----------------------------------------------
+
+# Set up stack -- 
+
+{
+  stk <- inla.stack(
+    data = list(dsl_mb = data$dsl_mb),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = inla.group(data$Elevation, method = 'quantile', n = 30),
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        Distance_to_wetland = data$Distance_to_wetland
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(dsl_mb = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Elevation = inla.group(predict_grid_scaled$Elevation, method = 'quantile', n = 30),
+        Northing = predict_grid_scaled@data$Northing,
+        Precipitation = predict_grid_scaled@data$Precipitation,
+        Snow = predict_grid_scaled@data$Snow,
+        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+full_model_elev_rw = inla(formula = p_tenuis_models$full_model_elev_rw, 
+                          family = 'nbinomial', 
+                          data = inla.stack.data(stk), 
+                          control.compute = list(waic = TRUE),
+                          control.predictor = list(A = inla.stack.A(stk))
+)
+
+full_model_elev_rw_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model"      = full_model_elev_rw
+)
+
+save(full_model_elev_rw_ls, file = "model_outputs/ptenuis/full_model_elev_rw_ls.Rdata")
+
+# P tenuis Reduced: Remove spatial effect, all covariates and rw elevation --------------
+
+# set up stacks
+{
+  stk <- inla.stack(
+    data = list(dsl_mb = data$dsl_mb),
+    A = list(1),
+    effects = list(
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = inla.group(data$Elevation, method = 'quantile', n = 30),
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        Distance_to_wetland = data$Distance_to_wetland
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(dsl_mb = NA),
+    A = list(1),
+    effects = list(
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Elevation = inla.group(predict_grid_scaled$Elevation, method = 'quantile', n = 30),
+        Northing = predict_grid_scaled@data$Northing,
+        Precipitation = predict_grid_scaled@data$Precipitation,
+        Snow = predict_grid_scaled@data$Snow,
+        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+  
+}
+
+red_mod_minus_speff = inla(formula = p_tenuis_models$red_mod_minus_speff, 
+                           family = 'nbinomial', 
+                           data = inla.stack.data(stk), 
+                           control.compute = list(waic = TRUE),
+                           control.predictor = list(A = inla.stack.A(stk))
+)
+
+red_mod_minus_speff_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model"      = red_mod_minus_speff
+)
+
+save(red_mod_minus_speff_ls, file = "model_outputs/ptenuis/red_mod_minus_speff_ls.Rdata")
+
+# P tenuis Reduced: Remove elevation rw; linear in all covariates ------------------
+
+# No stacks necessary
+
+red_mod_linear_all_cov = inla(formula = p_tenuis_models$red_mod_linear_all_cov,
+                              family = 'nbinomial',
+                              data = data,
+                              control.compute = list(waic = TRUE)
+)
+
+red_mod_linear_all_cov_ls = list(
+  "data_stack" = NA,
+  "join_stack" = NA,
+  "model"      = red_mod_linear_all_cov
+)
+
+save(red_mod_linear_all_cov_ls, file = 'model_outputs/ptenuis/red_mod_linear_all_cov_ls.Rdata')
+
+
+# P tenuis Reduced: Survival hypothesis -- precip, snow, wetland -------------------
+
+red_mod_survival = inla(formula = p_tenuis_models$red_mod_survival,
+                        family = 'nbinomial',
+                        data = data,
+                        control.compute = list(waic = TRUE)
+)
+
+red_mod_survival_ls = list(
+  "data_stack" = NA,
+  "join_stack" = NA,
+  "model"      = red_mod_survival
+)
+
+save(red_mod_survival_ls, file = 'model_outputs/ptenuis/red_mod_survival_ls.Rdata')
+
+# P tenuis Reduced: no survival -- large-scale and small-scale spatial vari --------
+
+# Set up stacks
+{
+  
+  stk <- inla.stack(
+    data = list(dsl_mb = data$dsl_mb),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Northing = data$Northing
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(dsl_mb = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Northing = predict_grid_scaled@data$Northing
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+red_mod_spatial = inla(formula = p_tenuis_models$red_mod_spatial, 
+                       family = 'nbinomial', 
+                       data = inla.stack.data(stk), 
+                       control.compute = list(waic = TRUE),
+                       control.predictor = list(A = inla.stack.A(stk))
+)
+
+red_mod_spatial_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = red_mod_spatial
+)
+
+save(red_mod_spatial_ls, file = "model_outputs/ptenuis/red_mod_spatial.Rdata")
+
+# P tenuis Reduced: No survival -- with linear elevation also ----------------------
+
+
+# Set up stacks
+{
+  
+  stk <- inla.stack(
+    data = list(dsl_mb = data$dsl_mb),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Northing = data$Northing,
+        Elevation = data$Elevation
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(dsl_mb = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Northing = predict_grid_scaled@data$Northing,
+        Elevation = predict_grid_scaled@data$Elevation
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+red_mod_spatial_elev_elev = inla(formula = p_tenuis_models$red_mod_spatial_elev, 
+                                 family = 'nbinomial', 
+                                 data = inla.stack.data(stk), 
+                                 control.compute = list(waic = TRUE),
+                                 control.predictor = list(A = inla.stack.A(stk))
+)
+
+red_mod_spatial_elev_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = red_mod_spatial_elev
+)
+
+save(red_mod_spatial_elev_ls, file = "model_outputs/ptenuis/red_mod_spatial_elev.Rdata")
 
 # HDS Model --------------------------------------------------------------------
 
@@ -884,192 +1035,6 @@ distdf <- data.frame(distance = seq(0,8,length=100))
 dfun <- predict(fit, distdf, ~ hn(distance,lsig))
 plot(dfun)
 
-# Very cool ---- now combine the two simply -----------------------
+# Fit to covariate models -------------------------------------------
 
-lik_parasite = like(family = 'nbinomial', 
-     formula = fmagna_ff ~ Easting + Elevation + I(Elevation^2) + Northing + Precipitation + I(Precipitation^2) + Snow + JulianDay, 
-     data = data)
-
-cmp_deer = scat_dens ~ mySPDE(map = coordinates, model = matern) + 
-  lsig + Intercept
-
-lik_deer = like(family = 'cp',
-                formula = coordinates + distance ~ mySPDE +
-                  log(hn(distance, lsig)) + 
-                  log(1/W) +
-                  Intercept, data = ds_data_sp,
-                components = cmp_deer,
-                samplers = deer_transects_2018)
-
-bru(cmp_deer, lik_deer)
-
-jcmp = fmagna_ff ~ Easting + Elevation + Northing + Precipitation + Snow + JulianDay + Intercept + coordinates + distance + mySPDE(map = coordinates, model = matern)
-
-test = bru(components = jcmp, lik_parasite, lik_deer)
-
-# Practice ---------------
-
-data(Seeds)
-
-df = data.frame(y = Seeds$r, Ntrials = Seeds$n, Seeds[, 3:5])
-
-family1 = "binomial"
-control.family1 = list(control.link=list(model="logit"))
-# number of trials is df$Ntrials
-
-hyper1 = list(theta = list(prior="pc.prec", param=c(1,0.01)))
-formula1 = y ~ x1 + x2 + f(plate, model="iid", hyper=hyper1)
-
-q1 = INLA:::inla.rw1(n = 5)
-
-crossprod(q1)
-
-INLA:::inla.rw2(n = 5)
-
-# Mesh example
-
-s <- 3 ### this factor will only changes C, not G
-pts <- rbind(c(1,1), c(2,1),
-             c(2.6, 1), c(0.7,1.7), 4:5/3, c(2,1.7))*s
-n <- nrow(pts)
-mesh0 <- inla.mesh.2d(pts[1:2,], max.edge=3*s,
-                      offset=1*s, n=6, cutoff=s*1/2)
-mesh <- inla.mesh.2d(rbind(c(3.3,1)*s, c(2.4,2)*s,
-                           mesh0$loc[-c(3:4),1:2]),
-                     max.edge=3*s, offset=1e-5, cutoff=s*1/2, n=100)
-(m <- mesh$n)
-dmesh <- inla.mesh.dual(mesh)
-fem <- inla.mesh.fem(mesh, order=1)
-A <- inla.spde.make.A(mesh, pts)
-
-# Geostats example
-
-data("SPDEtoy")
-
-str(SPDEtoy)
-
-pl.dom <- cbind(c(0, 1, 1, 0.7, 0), c(0, 0, 0.7, 1, 1))
-
-mesh5 <- inla.mesh.2d(pl.dom, max.e = c(0.092, 0.2))
-
-
-spde5 <- inla.spde2.pcmatern(
-  mesh = mesh5,
-  alpha = 2,
-  ### mesh and smoothness parameter
-  prior.range = c(0.3, 0.5),
-  ### P(practic.range<0.3)=0.5
-  prior.sigma = c(1, 0.01)
-) ### P(sigma>1)=0.01
-
-coords <- as.matrix(SPDEtoy[,1:2])
-A5 <- inla.spde.make.A(mesh5, loc=coords)
-
-stk5 <- inla.stack(
-  data = list(resp = SPDEtoy$y),
-  A = list(A5, 1),
-  effects = list(i = 1:spde5$n.spde,
-                 m = rep(1, nrow(SPDEtoy))),
-  tag = 'est'
-)
-
-res5 <- inla(
-  resp ~ 0 + m + f(i, model = spde5),
-  data = inla.stack.data(stk5),
-  control.predictor = list(A = inla.stack.A(stk5))
-)
-
-res5.field <- inla.spde2.result(res5, 'i', spde5, do.transf=TRUE)
-
-
-# Prediction during estimation
-pts3 <- rbind(c(.1,.1), c(.5,.55), c(.7,.9))
-
-dim(A5pts3 <- inla.spde.make.A(mesh5, loc=pts3))
-
-(jj3 <- which(colSums(A5pts3)>0))
-
-round(A5pts3[, jj3],3)
-
-stk5p.rf <- inla.stack(
-  data = list(resp = NA),
-  A = list(A5pts3),
-  effects = list(i = 1:spde5$n.spde),
-  tag = 'prd5r'
-)
-
-stk5.jp <- inla.stack(stk5, stk5p.rf)
-
-res5p <- inla(
-  resp ~ 0 + m + f(i, model = spde5),
-  data = inla.stack.data(stk5.jp),
-  control.predictor = list(A = inla.stack.A(stk5.jp), compute = TRUE)
-)
-
-# Prediction after estimation
-
-drop(A5pts3%*%res5$summary.random$i$mean)
-
-inla.mesh.project(inla.mesh.projector(mesh5, loc = pts3),
-                  res5$summary.random$i$mean)
-
-# Project onto mesh
-
-# project on grid with domain [0,1] x [0,1]
-pgrid0 <- inla.mesh.projector(mesh5, xlim=0:1, ylim=0:1, dims=c(101,101))
-
-# project posterior mean and standard deviation
-prd0.m <- inla.mesh.project(pgrid0, res5$summary.ran$i$mean)
-prd0.s <- inla.mesh.project(pgrid0, res5$summary.ran$i$s)
-
-
-# Predict response
-stk5.presp <- inla.stack(
-  data = list(resp = NA),
-  A = list(A5pts3, 1),
-  effects = list(i = 1:spde5$n.spde, m = rep(1, 3)),
-  tag = 'prd5.resp'
-)
-
-stk5.full <- inla.stack(stk5, stk5.presp)
-
-r5presp <- inla(
-  resp ~ 0 + m + f(i, model = spde5),
-  data = inla.stack.data(stk5.full),
-  control.predictor = list(A = inla.stack.A(stk5.full), compute = TRUE)
-)
-
-(indd3r <- inla.stack.index(stk5.full, 'prd5.resp')$data)
-
-round(r5presp$summary.fitted.values[indd3r,], 3)
-
-# Marginal distribution of point response
-marg3r <- r5presp$marginals.fitted.values[indd3r]
-
-# Response on a grid, disabling marginal distributions.
-stkgrid <- inla.stack(
-  data = list(resp = NA),
-  A = list(pgrid0$proj$A, 1),
-  effects = list(i = 1:spde5$n.spde,
-                 m = rep(1, 101 * 101)),
-  tag = 'prd.gr'
-)
-
-stk.all <- inla.stack(stk5, stkgrid)
-res5g <- inla(
-  resp ~ 0 + m + f(i, model = spde5),
-  data = inla.stack.data(stk.all),
-  control.predictor = list(A = inla.stack.A(stk.all),
-                           compute = TRUE),
-  quantiles = NULL,
-  control.results = list(
-    return.marginals.random = FALSE,
-    return.marginals.predictor = FALSE
-  )
-)
-res5g$cpu
-
-# Indexes of prediction grid
-igr <- inla.stack.index(stk.all, 'prd.gr')$data
-
-
+# Obtain habitat covariates
