@@ -10,11 +10,14 @@ library(MASS)
 library(GGally)
 library(MuMIn) 
 library(viridis)
+library(reshape2)
 library(dplyr)
 
 source('functions.R')
 load(file = 'scaled_covariates.Rdata')
 load(file = 'scaled_covariates_attr.Rdata')
+
+# Load data ----------------------------------------
 
 metadata = read.csv(file = 'metadata_adjusted.csv', stringsAsFactors = F)
 
@@ -978,6 +981,8 @@ ds_data_sp = ds_data
 
 coordinates(ds_data_sp) = ~Easting + Northing
 
+proj4string(ds_data_sp) = proj4string(predict_grid)
+
 ds_data_sp$distance = ds_data_sp$PERP_DIST_M
 
 # What is the strip half-width? Set to a little larger than max distance
@@ -1038,3 +1043,130 @@ plot(dfun)
 # Fit to covariate models -------------------------------------------
 
 # Obtain habitat covariates
+
+predict_grid_bak = predict_grid
+
+load('predict_grid_1000.Rdata')
+
+predict_grid@data = cbind.data.frame(predict_grid_bak@data, 
+                                     predict_grid@data %>% 
+                                       select(Highway, 
+                                              MinorRoad, 
+                                              Conifer, 
+                                              Deciduous, 
+                                              Mixed, 
+                                              Wetland))
+
+rm(predict_grid_bak); gc()
+
+# Combine in with ds_data
+
+ds_data_sp@data = cbind.data.frame(ds_data_sp@data, 
+                                   over(x = ds_data_sp, y = predict_grid))
+
+# Scale
+
+ds_data_scaled = ds_data_sp
+
+ds_data_scaled@data = ds_data_scaled@data %>% 
+  mutate(Northing            = scale(Northing),
+         Easting             = scale(Easting),
+         Elevation           = scale(Elevation),
+         Precipitation       = scale(Precipitation),
+         Snow                = scale(Snow),
+         Distance_to_wetland = scale(Distance_to_wetland),
+         Highway             = scale(Highway),
+         MinorRoad           = scale(MinorRoad)
+         )
+
+habs_frame = ds_data_scaled@data %>% select(Conifer:Wetland)
+
+habs_vec   = apply(X = habs_frame, MARGIN = 1, FUN = function(x){
+  nam = names(habs_frame)[which(x == 1)]
+  nam = ifelse(length(nam) == 0, NA, nam)
+  return(nam)
+  })
+
+ds_data_scaled@data$Habitat = habs_vec
+
+
+# HDS Models --------------------------------------------------------
+
+# No spde models
+
+# Habitat
+
+cmp = ~ lsig + Intercept + Conifer + Mixed + Wetland
+
+formula = coordinates + distance ~ 
+  log(hn(distance, lsig)) + 
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland
+
+fit = lgcp(components = cmp, 
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+save(fit, file = 'model_outputs/hds/habitat.Rdata')
+
+
+# Spde models
+
+# Habitat + spde
+cmp = ~ mySPDE(map = coordinates, model = matern) + 
+  lsig + Intercept + Conifer + Mixed + Wetland
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) + 
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland
+
+fit = lgcp(components = cmp, 
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+save(fit, file = 'model_outputs/hds/habitat_spde.Rdata')
+
+# Habitat + elevation + spde
+
+cmp = ~ mySPDE(map = coordinates, model = matern) + 
+  lsig + Intercept + Conifer + Mixed + Wetland + Elevation
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) + 
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland + Elevation
+
+fit = lgcp(components = cmp, 
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+save(fit, file = 'model_outputs/hds/habitat_elev_spde.Rdata')
+
+# Habitat + elevation + spatial + spde
+
+cmp = ~ mySPDE(map = coordinates, model = matern) + 
+  lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) + 
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp, 
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+save(fit, file = 'model_outputs/hds/habitat_elev_spatial_spde.Rdata')
