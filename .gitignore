@@ -3,3 +3,4 @@
 *.Rdata
 images/*
 inlabru_test.R
+.Rproj.user
