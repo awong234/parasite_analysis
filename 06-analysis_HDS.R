@@ -1096,7 +1096,7 @@ ds_data_scaled@data$Habitat = habs_vec
 
 # HDS Models --------------------------------------------------------
 
-readr::read_csv('hds_models.csv')
+hds_models = readr::read_csv('hds_models.csv')
 
 # List the models
 
@@ -1193,6 +1193,23 @@ summary(fit)
 
 saveRDS(fit, file = 'model_outputs/hds/human_elev.RDS')
 
+# Human presence + elevation + spatial
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Elevation + Northing + Easting
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_elev_spat.RDS')
 
 # Spde models
 
