@@ -1114,7 +1114,80 @@ fit = lgcp(components = cmp,
 
 summary(fit)
 
-save(fit, file = 'model_outputs/hds/habitat.Rdata')
+saveRDS(fit, file = 'model_outputs/hds/habitat.RDS')
+
+
+# Habitat + elevation
+
+cmp = ~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation
+
+formula = coordinates + distance ~ 
+  log(hn(distance, lsig)) + 
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland + Elevation
+
+fit = lgcp(components = cmp, 
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_elev.RDS')
+
+# Habitat + Elevation + Spatial 
+
+cmp = ~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+formula = coordinates + distance ~ 
+  log(hn(distance, lsig)) + 
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp, 
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_elev_spat.RDS')
+
+# Human presence
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad
+
+formula = coordinates + distance ~ 
+  log(hn(distance, lsig)) + 
+  log(1/W) +
+  Intercept + Highway + MinorRoad
+
+fit = lgcp(components = cmp, 
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human.RDS')
+
+# Human presence + elevation
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Elevation
+
+formula = coordinates + distance ~ 
+  log(hn(distance, lsig)) + 
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Elevation
+
+fit = lgcp(components = cmp, 
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_elev.RDS')
 
 
 # Spde models
@@ -1135,7 +1208,7 @@ fit = lgcp(components = cmp,
 
 summary(fit)
 
-save(fit, file = 'model_outputs/hds/habitat_spde.Rdata')
+saveRDS(fit, file = 'model_outputs/hds/habitat_spde.RDS')
 
 # Habitat + elevation + spde
 
@@ -1154,7 +1227,7 @@ fit = lgcp(components = cmp,
 
 summary(fit)
 
-save(fit, file = 'model_outputs/hds/habitat_elev_spde.Rdata')
+saveRDS(fit, file = 'model_outputs/hds/habitat_elev_spde.RDS')
 
 # Habitat + elevation + spatial + spde
 
@@ -1173,4 +1246,5 @@ fit = lgcp(components = cmp,
 
 summary(fit)
 
-save(fit, file = 'model_outputs/hds/habitat_elev_spatial_spde.Rdata')
+saveRDS(fit, file = 'model_outputs/hds/habitat_elev_spatial_spde.RDS')
+
