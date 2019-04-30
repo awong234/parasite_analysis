@@ -1092,6 +1092,10 @@ ds_data_scaled@data$Habitat = habs_vec
 
 # HDS Models --------------------------------------------------------
 
+readr::read_csv('hds_models.csv')
+
+# List the models
+
 # No spde models
 
 # Habitat
