@@ -1,9 +1,13 @@
-Name,SPDE,Model
-habitat,FALSE,~ lsig + Intercept + Conifer + Mixed + Wetland
-habitat_elev,FALSE,~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation
-habitat_elev_spat,FALSE,~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
-human,FALSE,~ lsig + Intercept + Highway + MinorRoad
-human_elev,FALSE,~ lsig + Intercept + Highway + MinorRoad + Elevation
-habitat_spde,TRUE,"~ mySPDE(map = coordinates, model = matern) + lsig + Intercept + Conifer + Mixed + Wetland"
-habitat_elev_spde,TRUE,"~ mySPDE(map = coordinates, model = matern) + lsig + Intercept + Conifer + Mixed + Wetland + Elevation"
-habitat_elev_spatial_spde,TRUE,"~ mySPDE(map = coordinates, model = matern) + lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting"
+Order,Name,SPDE,Model
+1,habitat,FALSE,~ lsig + Intercept + Conifer + Mixed + Wetland
+2,habitat_elev,FALSE,~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation
+3,habitat_elev_spat,FALSE,~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+4,human,FALSE,~ lsig + Intercept + Highway + MinorRoad
+5,human_elev,FALSE,~ lsig + Intercept + Highway + MinorRoad + Elevation
+6,human_elev_spat,FALSE,~ lsig + Intercept + Highway + MinorRoad + Elevation + Northing + Easting
+7,habitat_spde,TRUE,"~ mySPDE(map = coordinates, model = matern) + lsig + Intercept + Conifer + Mixed + Wetland"
+8,habitat_elev_spde,TRUE,"~ mySPDE(map = coordinates, model = matern) + lsig + Intercept + Conifer + Mixed + Wetland + Elevation"
+9,habitat_elev_spatial_spde,TRUE,"~ mySPDE(map = coordinates, model = matern) + lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting"
+10,human_spde,TRUE,"~ mySPDE(map = coordinates, model = matern) + lsig + Intercept + Highway + MinorRoad"
+11,human_elev_spde,TRUE,"~ mySPDE(map = coordinates, model = matern) + lsig + Intercept + Highway + MinorRoad + Elevation"
+12,human_elev_spatial_spde,TRUE,"~ mySPDE(map = coordinates, model = matern) + lsig + Intercept + Highway + MinorRoad + Elevation + Northing + Easting"
