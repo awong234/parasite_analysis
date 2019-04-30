@@ -967,7 +967,7 @@ red_mod_spatial_elev_ls = list(
 
 save(red_mod_spatial_elev_ls, file = "model_outputs/ptenuis/red_mod_spatial_elev.Rdata")
 
-# HDS Model --------------------------------------------------------------------
+# Test HDS Model --------------------------------------------------------------------
 
 # Keep mesh model from previous.
 
@@ -1040,7 +1040,8 @@ distdf <- data.frame(distance = seq(0,8,length=100))
 dfun <- predict(fit, distdf, ~ hn(distance,lsig))
 plot(dfun)
 
-# Fit to covariate models -------------------------------------------
+
+# Setup to fit covariate models -------------------------------------------
 
 # Null model is meaningless here, since it will be multiplied against parasite models. Will be using
 # covariate models only.
