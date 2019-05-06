@@ -16,6 +16,7 @@ library(dplyr)
 source('functions.R')
 load(file = 'scaled_covariates.Rdata')
 load(file = 'scaled_covariates_attr.Rdata')
+load(file = '.RData')
 
 # Load data ----------------------------------------
 
@@ -560,40 +561,6 @@ red_mod_spatial_elev_ls = list(
 
 save(red_mod_spatial_elev_ls, file = "model_outputs/red_mod_spatial_elev.Rdata")
 
-# Summaries f magna -------------------------------------
-
-m_out = list.files('model_outputs/', full.names = T)
-
-for(m in m_out){
-  load(m)
-}
-
-mod_list = list(
-  'null_model_ls'             = null_model_ls,
-  'full_model_ls'             = full_model_ls,
-  'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
-  'red_mod_spatial_ls'        = red_mod_spatial_ls,
-  'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
-  'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
-  'red_mod_survival_ls'       = red_mod_survival_ls
-)
-
-
-
-aicFunc = function(model_ls){
-
-  item = model_ls[[3]]
-
-  waic = item$waic$`waic`
-
-}
-
-aic_vals = sapply(mod_list, aicFunc)
-
-aic_df = data.frame("model" = names(mod_list), "waic" = aic_vals)
-
-aic_df %>% arrange(waic)
-
 # P tenuis models -----------------------------------------------
 
 p_tenuis_models = list()
@@ -1096,8 +1063,6 @@ ds_data_scaled@data$Habitat = habs_vec
 
 # HDS Models --------------------------------------------------------
 
-hds_models = readr::read_csv('hds_models.csv')
-
 # List the models
 
 # No spde models
@@ -1269,3 +1234,258 @@ summary(fit)
 
 saveRDS(fit, file = 'model_outputs/hds/habitat_elev_spatial_spde.RDS')
 
+# Human + spde
+
+cmp = ~ mySPDE(map = coordinates, model = matern) +
+  lsig + Intercept + Highway + MinorRoad
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_spde.RDS')
+
+# Human + elev + spde
+
+cmp = ~ mySPDE(map = coordinates, model = matern) +
+  lsig + Intercept + Highway + MinorRoad + Elevation
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Elevation
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_elev_spde.RDS')
+
+# Human + elev + spde + spat
+
+cmp = ~ mySPDE(map = coordinates, model = matern) +
+  lsig + Intercept + Highway + MinorRoad + Elevation + Northing + Easting
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_elev_spatial_spde.RDS')
+
+# Habitat + human
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human.RDS')
+
+# habitat_human_spde
+
+cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_spde.RDS')
+
+# habitat_human_elev
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev.RDS')
+
+# habitat_human_elev_spde
+
+cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + 
+  Conifer + Mixed + Wetland + Elevation
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev_spde.RDS')
+
+# habitat_human_elev_spat
+
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + 
+  Elevation + Northing + Easting
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev_spat.RDS')
+
+# habitat_human_elev_spat_spde
+
+cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + 
+  Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev_spde.RDS')
+
+# # # # # # # # # # # # # # # # # # # # # # # # 
+# Summarize model results #####################
+# # # # # # # # # # # # # # # # # # # # # # # # 
+
+
+# Summaries f magna -------------------------------------
+
+m_out = list.files('model_outputs/fmagna/', full.names = T)
+
+for(m in m_out){
+  load(m)
+}
+
+mod_list = list(
+  'null_model_ls'             = null_model_ls,
+  'full_model_ls'             = full_model_ls,
+  'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
+  'red_mod_spatial_ls'        = red_mod_spatial_ls,
+  'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
+  'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
+  'red_mod_survival_ls'       = red_mod_survival_ls
+)
+
+
+aic_vals_fmagna = sapply(mod_list, aicFunc)
+
+aic_vals_fmagna = data.frame("model" = names(mod_list), "waic" = aic_vals_fmagna) %>% arrange(waic)
+
+rm(list = mod_list %>% names) ; gc()
+
+aic_vals_fmagna
+
+# Summaries p tenuis models -------------------------------------------------
+
+m_out = list.files('model_outputs/ptenuis/', full.names = T)
+
+for(m in m_out){
+  load(m)
+}
+
+mod_list = list(
+  'null_model_ls'             = null_model_ls,
+  'full_model_ls'             = full_model_ls,
+  'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
+  'red_mod_spatial_ls'        = red_mod_spatial_ls,
+  'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
+  'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
+  'red_mod_survival_ls'       = red_mod_survival_ls
+)
+
+
+aic_vals_ptenuis = sapply(mod_list, aicFunc)
+
+aic_vals_ptenuis = data.frame("model" = names(mod_list), "waic" = aic_vals_ptenuis) %>% arrange(waic)
+
+rm(list = mod_list %>% names) ; gc()
+
+aic_vals_ptenuis
+
+# Summaries hds ---------------------------------------------
+
+hds_models = readr::read_csv('hds_models.csv')
+
+models_list = list.files(path = 'model_outputs/hds/', full.names = T)
+
+hds_models_name = hds_models$Name
+
+waic_ls = hds_model_waic(hds_models_name = hds_models_name, models_list = models_list)
+
+waic_vec = do.call(what = c, args = waic_ls)
+
+(waic_df = data.frame(model = names(waic_vec), waic = waic_vec, row.names = NULL) %>% arrange(waic))
+
+waic_df
+
+pxl = pixels(mesh = adk_mesh)
+
+habitat_human_elev_spat = readRDS('model_outputs/hds/habitat_human_elev_spat.RDS')
+
+prd = predict(object = habitat_human_elev_spat, 
+        pxl, 
+        formula = ~
+          log(hn(distance, lsig)) +
+          log(1/W) +
+          Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+)
