@@ -8,13 +8,17 @@ library(magrittr)
 library(ggplot2)
 library(MASS)
 library(GGally)
-library(MuMIn) 
+library(MuMIn)
 library(viridis)
+library(reshape2)
 library(dplyr)
 
 source('functions.R')
 load(file = 'scaled_covariates.Rdata')
 load(file = 'scaled_covariates_attr.Rdata')
+load(file = '.RData')
+
+# Load data ----------------------------------------
 
 metadata = read.csv(file = 'metadata_adjusted.csv', stringsAsFactors = F)
 
@@ -24,8 +28,8 @@ ff = read.csv(file = 'fecal_flukefinder.csv', stringsAsFactors = F)
 mb = read.csv(file = 'fecal_MB.csv', stringsAsFactors = F)
 quant = read.csv(file = 'fecal_quant.csv', stringsAsFactors = F)
 
-metadata_join = metadata %>% left_join(ff %>% select(PK, Total_eggs)) %>% rename(fmagna_ff = Total_eggs) %>% 
-  left_join(mb %>% select(PK, Total_larvae_dsl, total_eggs_fmagna)) %>% rename(dsl_mb = Total_larvae_dsl, fmagna_mb = total_eggs_fmagna) %>% 
+metadata_join = metadata %>% left_join(ff %>% select(PK, Total_eggs)) %>% rename(fmagna_ff = Total_eggs) %>%
+  left_join(mb %>% select(PK, Total_larvae_dsl, total_eggs_fmagna)) %>% rename(dsl_mb = Total_larvae_dsl, fmagna_mb = total_eggs_fmagna) %>%
   left_join(quant %>% select(PK, Fascioloides_magna, Protostrongylid_DSL)) %>% rename(fmagna_quant = Fascioloides_magna, dsl_quant = Protostrongylid_DSL)
 
 # Which na
@@ -91,11 +95,11 @@ precip_dates = data.frame(file = precip_names, year = precip_names %>% {regmatch
 precip_data = matrix(NA, nrow = NROW(predict_grid), ncol = length(precip_files))
 
 for(f in 1:length(precip_files)){
-  
+
   precip = raster::raster(precip_files[f])
-  
+
   precip_data[,f] = raster::extract(precip, predict_grid)
-  
+
 }
 
 precip_means = precip_data %>% rowMeans()
@@ -115,11 +119,11 @@ snowcover_dates = data.frame(file = snowcover_names, year = snowcover_names %>% 
 snowcover_data = matrix(NA, nrow = NROW(predict_grid), ncol = length(snowcover_paths))
 
 for(f in 1:length(snowcover_paths)){
-  
+
   snowcover = raster::raster(snowcover_paths[f])
-  
+
   snowcover_data[,f] = raster::extract(snowcover, predict_grid)
-  
+
 }
 
 # Mean snowcover
@@ -161,7 +165,7 @@ f_magna_models[['full_model']] = as.formula("fmagna_ff ~ Easting + Northing + Pr
 # Full model with elevation random walk
 f_magna_models[['full_model_elev_rw']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1') + f(i, model = spde)")
 
-# Reduced models 
+# Reduced models
 
 # Remove spatial effect, all covariates and rw elevation
 f_magna_models[['red_mod_minus_speff']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1')")
@@ -184,7 +188,7 @@ f_magna_models[['red_mod_spatial_elev']] = as.formula("fmagna_ff ~ Easting + Nor
 # MODEL RUNS ###################################
 #'###############################################
 #
-# 
+#
 
 # Make the A matrices and spde for all subsequent stacks
 boundary <- list(
@@ -212,7 +216,7 @@ spde <- inla.spde2.pcmatern(
   ### P(practic.range<0.3)=0.5
   prior.sigma = c(1, 0.01)
   ### P(sigma>1)=0.01
-) 
+)
 
 
 # Null model -------------------------------
@@ -231,15 +235,15 @@ save(null_model_ls, file = "model_outputs/null_model.Rdata")
 
 # Set up stacks
 {
- 
-  
+
+
   # ggplot() +
   #   gg(data_sp) +
   #   gg(adk_mesh) +
   #   gg(adkbound) +
   #   coord_fixed(ratio = 1)
-  
-  
+
+
   stk <- inla.stack(
     data = list(fmagna_ff = data$fmagna_ff),
     A = list(projector_A, 1),
@@ -257,7 +261,7 @@ save(null_model_ls, file = "model_outputs/null_model.Rdata")
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(fmagna_ff = NA),
     A = list(predictor_A, 1),
@@ -275,14 +279,14 @@ save(null_model_ls, file = "model_outputs/null_model.Rdata")
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
+
 }
 
-full_model = inla(formula = f_magna_models$full_model, 
-                  family = 'nbinomial', 
-                  data = inla.stack.data(stk), 
+full_model = inla(formula = f_magna_models$full_model,
+                  family = 'nbinomial',
+                  data = inla.stack.data(stk),
                   control.compute = list(waic = TRUE),
                   control.predictor = list(A = inla.stack.A(stk))
                   )
@@ -297,7 +301,7 @@ save(full_model_ls, file = "model_outputs/full_model.Rdata")
 
 # Full model with elevation random walk -----------------------------------------------
 
-# Set up stack -- 
+# Set up stack --
 
 {
   stk <- inla.stack(
@@ -317,7 +321,7 @@ save(full_model_ls, file = "model_outputs/full_model.Rdata")
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(fmagna_ff = NA),
     A = list(predictor_A, 1),
@@ -335,14 +339,14 @@ save(full_model_ls, file = "model_outputs/full_model.Rdata")
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
+
 }
 
-full_model_elev_rw = inla(formula = f_magna_models$full_model_elev_rw, 
-                          family = 'nbinomial', 
-                          data = inla.stack.data(stk), 
+full_model_elev_rw = inla(formula = f_magna_models$full_model_elev_rw,
+                          family = 'nbinomial',
+                          data = inla.stack.data(stk),
                           control.compute = list(waic = TRUE),
                           control.predictor = list(A = inla.stack.A(stk))
 )
@@ -375,7 +379,7 @@ save(full_model_elev_rw_ls, file = "model_outputs/full_model_elev_rw_ls.Rdata")
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(fmagna_ff = NA),
     A = list(1),
@@ -392,15 +396,15 @@ save(full_model_elev_rw_ls, file = "model_outputs/full_model_elev_rw_ls.Rdata")
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
-  
+
+
 }
 
-red_mod_minus_speff = inla(formula = f_magna_models$red_mod_minus_speff, 
-                          family = 'nbinomial', 
-                          data = inla.stack.data(stk), 
+red_mod_minus_speff = inla(formula = f_magna_models$red_mod_minus_speff,
+                          family = 'nbinomial',
+                          data = inla.stack.data(stk),
                           control.compute = list(waic = TRUE),
                           control.predictor = list(A = inla.stack.A(stk))
 )
@@ -454,7 +458,7 @@ save(red_mod_survival_ls, file = 'model_outputs/red_mod_survival_ls.Rdata')
 
 # Set up stacks
 {
-  
+
   stk <- inla.stack(
     data = list(fmagna_ff = data$fmagna_ff),
     A = list(projector_A, 1),
@@ -468,7 +472,7 @@ save(red_mod_survival_ls, file = 'model_outputs/red_mod_survival_ls.Rdata')
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(fmagna_ff = NA),
     A = list(predictor_A, 1),
@@ -482,14 +486,14 @@ save(red_mod_survival_ls, file = 'model_outputs/red_mod_survival_ls.Rdata')
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
+
 }
 
-red_mod_spatial = inla(formula = f_magna_models$red_mod_spatial, 
-                  family = 'nbinomial', 
-                  data = inla.stack.data(stk), 
+red_mod_spatial = inla(formula = f_magna_models$red_mod_spatial,
+                  family = 'nbinomial',
+                  data = inla.stack.data(stk),
                   control.compute = list(waic = TRUE),
                   control.predictor = list(A = inla.stack.A(stk))
 )
@@ -507,7 +511,7 @@ save(red_mod_spatial_ls, file = "model_outputs/red_mod_spatial.Rdata")
 
 # Set up stacks
 {
-  
+
   stk <- inla.stack(
     data = list(fmagna_ff = data$fmagna_ff),
     A = list(projector_A, 1),
@@ -522,7 +526,7 @@ save(red_mod_spatial_ls, file = "model_outputs/red_mod_spatial.Rdata")
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(fmagna_ff = NA),
     A = list(predictor_A, 1),
@@ -537,14 +541,14 @@ save(red_mod_spatial_ls, file = "model_outputs/red_mod_spatial.Rdata")
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
+
 }
 
-red_mod_spatial_elev_elev = inla(formula = f_magna_models$red_mod_spatial_elev_elev, 
-                       family = 'nbinomial', 
-                       data = inla.stack.data(stk), 
+red_mod_spatial_elev_elev = inla(formula = f_magna_models$red_mod_spatial_elev_elev,
+                       family = 'nbinomial',
+                       data = inla.stack.data(stk),
                        control.compute = list(waic = TRUE),
                        control.predictor = list(A = inla.stack.A(stk))
 )
@@ -556,40 +560,6 @@ red_mod_spatial_elev_ls = list(
 )
 
 save(red_mod_spatial_elev_ls, file = "model_outputs/red_mod_spatial_elev.Rdata")
-
-# Summaries f magna -------------------------------------
-
-m_out = list.files('model_outputs/', full.names = T)
-
-for(m in m_out){
-  load(m)
-}
-
-mod_list = list(
-  'null_model_ls'             = null_model_ls,
-  'full_model_ls'             = full_model_ls,
-  'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
-  'red_mod_spatial_ls'        = red_mod_spatial_ls,
-  'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
-  'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
-  'red_mod_survival_ls'       = red_mod_survival_ls
-)
-
-
-
-aicFunc = function(model_ls){
-  
-  item = model_ls[[3]]
-  
-  waic = item$waic$`waic`
-  
-}
-
-aic_vals = sapply(mod_list, aicFunc)
-
-aic_df = data.frame("model" = names(mod_list), "waic" = aic_vals)
-
-aic_df %>% arrange(waic)
 
 # P tenuis models -----------------------------------------------
 
@@ -605,7 +575,7 @@ p_tenuis_models[['full_model']] = as.formula("dsl_mb ~ Easting + Northing + Prec
 # Full model with elevation random walk
 p_tenuis_models[['full_model_elev_rw']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1') + f(i, model = spde)")
 
-# Reduced models 
+# Reduced models
 
 # Remove spatial effect, all covariates and rw elevation
 p_tenuis_models[['red_mod_minus_speff']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1')")
@@ -640,15 +610,15 @@ save(null_model_ls, file = "model_outputs/ptenuis/null_model.Rdata")
 
 # Set up stacks
 {
-  
-  
+
+
   # ggplot() +
   #   gg(data_sp) +
   #   gg(adk_mesh) +
   #   gg(adkbound) +
   #   coord_fixed(ratio = 1)
-  
-  
+
+
   stk <- inla.stack(
     data = list(dsl_mb = data$dsl_mb),
     A = list(projector_A, 1),
@@ -666,7 +636,7 @@ save(null_model_ls, file = "model_outputs/ptenuis/null_model.Rdata")
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(dsl_mb = NA),
     A = list(predictor_A, 1),
@@ -684,14 +654,14 @@ save(null_model_ls, file = "model_outputs/ptenuis/null_model.Rdata")
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
+
 }
 
-full_model = inla(formula = p_tenuis_models$full_model, 
-                  family = 'nbinomial', 
-                  data = inla.stack.data(stk), 
+full_model = inla(formula = p_tenuis_models$full_model,
+                  family = 'nbinomial',
+                  data = inla.stack.data(stk),
                   control.compute = list(waic = TRUE),
                   control.predictor = list(A = inla.stack.A(stk))
 )
@@ -706,7 +676,7 @@ save(full_model_ls, file = "model_outputs/ptenuis/full_model.Rdata")
 
 # P tenuis Full model with elevation random walk -----------------------------------------------
 
-# Set up stack -- 
+# Set up stack --
 
 {
   stk <- inla.stack(
@@ -726,7 +696,7 @@ save(full_model_ls, file = "model_outputs/ptenuis/full_model.Rdata")
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(dsl_mb = NA),
     A = list(predictor_A, 1),
@@ -744,14 +714,14 @@ save(full_model_ls, file = "model_outputs/ptenuis/full_model.Rdata")
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
+
 }
 
-full_model_elev_rw = inla(formula = p_tenuis_models$full_model_elev_rw, 
-                          family = 'nbinomial', 
-                          data = inla.stack.data(stk), 
+full_model_elev_rw = inla(formula = p_tenuis_models$full_model_elev_rw,
+                          family = 'nbinomial',
+                          data = inla.stack.data(stk),
                           control.compute = list(waic = TRUE),
                           control.predictor = list(A = inla.stack.A(stk))
 )
@@ -784,7 +754,7 @@ save(full_model_elev_rw_ls, file = "model_outputs/ptenuis/full_model_elev_rw_ls.
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(dsl_mb = NA),
     A = list(1),
@@ -801,15 +771,15 @@ save(full_model_elev_rw_ls, file = "model_outputs/ptenuis/full_model_elev_rw_ls.
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
-  
+
+
 }
 
-red_mod_minus_speff = inla(formula = p_tenuis_models$red_mod_minus_speff, 
-                           family = 'nbinomial', 
-                           data = inla.stack.data(stk), 
+red_mod_minus_speff = inla(formula = p_tenuis_models$red_mod_minus_speff,
+                           family = 'nbinomial',
+                           data = inla.stack.data(stk),
                            control.compute = list(waic = TRUE),
                            control.predictor = list(A = inla.stack.A(stk))
 )
@@ -861,7 +831,7 @@ save(red_mod_survival_ls, file = 'model_outputs/ptenuis/red_mod_survival_ls.Rdat
 
 # Set up stacks
 {
-  
+
   stk <- inla.stack(
     data = list(dsl_mb = data$dsl_mb),
     A = list(projector_A, 1),
@@ -875,7 +845,7 @@ save(red_mod_survival_ls, file = 'model_outputs/ptenuis/red_mod_survival_ls.Rdat
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(dsl_mb = NA),
     A = list(predictor_A, 1),
@@ -889,14 +859,14 @@ save(red_mod_survival_ls, file = 'model_outputs/ptenuis/red_mod_survival_ls.Rdat
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
+
 }
 
-red_mod_spatial = inla(formula = p_tenuis_models$red_mod_spatial, 
-                       family = 'nbinomial', 
-                       data = inla.stack.data(stk), 
+red_mod_spatial = inla(formula = p_tenuis_models$red_mod_spatial,
+                       family = 'nbinomial',
+                       data = inla.stack.data(stk),
                        control.compute = list(waic = TRUE),
                        control.predictor = list(A = inla.stack.A(stk))
 )
@@ -914,7 +884,7 @@ save(red_mod_spatial_ls, file = "model_outputs/ptenuis/red_mod_spatial.Rdata")
 
 # Set up stacks
 {
-  
+
   stk <- inla.stack(
     data = list(dsl_mb = data$dsl_mb),
     A = list(projector_A, 1),
@@ -929,7 +899,7 @@ save(red_mod_spatial_ls, file = "model_outputs/ptenuis/red_mod_spatial.Rdata")
     ),
     tag = 'dat'
   )
-  
+
   stk_predictor = inla.stack(
     data = list(dsl_mb = NA),
     A = list(predictor_A, 1),
@@ -944,14 +914,14 @@ save(red_mod_spatial_ls, file = "model_outputs/ptenuis/red_mod_spatial.Rdata")
     ),
     tag = 'pred'
   )
-  
+
   stk_jp = inla.stack(stk, stk_predictor)
-  
+
 }
 
-red_mod_spatial_elev_elev = inla(formula = p_tenuis_models$red_mod_spatial_elev, 
-                                 family = 'nbinomial', 
-                                 data = inla.stack.data(stk), 
+red_mod_spatial_elev_elev = inla(formula = p_tenuis_models$red_mod_spatial_elev,
+                                 family = 'nbinomial',
+                                 data = inla.stack.data(stk),
                                  control.compute = list(waic = TRUE),
                                  control.predictor = list(A = inla.stack.A(stk))
 )
@@ -964,9 +934,9 @@ red_mod_spatial_elev_ls = list(
 
 save(red_mod_spatial_elev_ls, file = "model_outputs/ptenuis/red_mod_spatial_elev.Rdata")
 
-# HDS Model --------------------------------------------------------------------
+# Test HDS Model --------------------------------------------------------------------
 
-# Keep mesh model from previous. 
+# Keep mesh model from previous.
 
 # Need transect lines, ds data
 
@@ -978,6 +948,8 @@ ds_data_sp = ds_data
 
 coordinates(ds_data_sp) = ~Easting + Northing
 
+proj4string(ds_data_sp) = proj4string(predict_grid)
+
 ds_data_sp$distance = ds_data_sp$PERP_DIST_M
 
 # What is the strip half-width? Set to a little larger than max distance
@@ -986,26 +958,26 @@ W = ceiling(max(ds_data$PERP_DIST_M)) # 3 meters
 
 # Define half-normal detection function
 
-hn = function(distance, lsig){ 
+hn = function(distance, lsig){
   exp(-0.5*(distance/exp(lsig))^2)}
 
 # Define matern SPDE function for deer scats
 
-matern <- inla.spde2.pcmatern(adk_mesh, 
-                              prior.sigma = c(2, 0.01), 
+matern <- inla.spde2.pcmatern(adk_mesh,
+                              prior.sigma = c(2, 0.01),
                               prior.range = c(1000, 0.5))
 
 # Define components of SPDE model
 
-cmp = ~ mySPDE(map = coordinates, model = matern) + 
+cmp = ~ mySPDE(map = coordinates, model = matern) +
   lsig + Intercept
 
 formula = coordinates + distance ~ mySPDE +
-  log(hn(distance, lsig)) + 
+  log(hn(distance, lsig)) +
   log(1/W) +
   Intercept
 
-fit = lgcp(components = cmp, 
+fit = lgcp(components = cmp,
            data = ds_data_sp,
            samplers = deer_transects_2018,
            formula = formula)
@@ -1023,7 +995,7 @@ pr.int <- predict(fit, pxl, ~ exp(mySPDE))
 ggplot() + gg(pr.int) + gg(adkbound) +
   gg(deer_transects_2018, color = "red") +
   gg(ds_data_sp, size = 0.2, alpha = 1) +
-  noyticks + noxticks  + 
+  noyticks + noxticks  +
   theme(legend.key.width = unit(x = 0.2,"cm"), legend.key.height = unit(x = 0.3,"cm")) +
   theme(legend.text=element_text(size=6)) +
   # guides(fill=FALSE) +
@@ -1035,6 +1007,485 @@ distdf <- data.frame(distance = seq(0,8,length=100))
 dfun <- predict(fit, distdf, ~ hn(distance,lsig))
 plot(dfun)
 
-# Fit to covariate models -------------------------------------------
+
+# Setup to fit covariate models -------------------------------------------
+
+# Null model is meaningless here, since it will be multiplied against parasite models. Will be using
+# covariate models only.
 
 # Obtain habitat covariates
+
+predict_grid_bak = predict_grid
+
+load('predict_grid_1000.Rdata')
+
+predict_grid@data = cbind.data.frame(predict_grid_bak@data,
+                                     predict_grid@data %>%
+                                       select(Highway,
+                                              MinorRoad,
+                                              Conifer,
+                                              Deciduous,
+                                              Mixed,
+                                              Wetland))
+
+rm(predict_grid_bak); gc()
+
+# Combine in with ds_data
+
+ds_data_sp@data = cbind.data.frame(ds_data_sp@data,
+                                   over(x = ds_data_sp, y = predict_grid))
+
+# Scale
+
+ds_data_scaled = ds_data_sp
+
+ds_data_scaled@data = ds_data_scaled@data %>%
+  mutate(Northing            = scale(Northing),
+         Easting             = scale(Easting),
+         Elevation           = scale(Elevation),
+         Precipitation       = scale(Precipitation),
+         Snow                = scale(Snow),
+         Distance_to_wetland = scale(Distance_to_wetland),
+         Highway             = scale(Highway),
+         MinorRoad           = scale(MinorRoad)
+         )
+
+habs_frame = ds_data_scaled@data %>% select(Conifer:Wetland)
+
+habs_vec   = apply(X = habs_frame, MARGIN = 1, FUN = function(x){
+  nam = names(habs_frame)[which(x == 1)]
+  nam = ifelse(length(nam) == 0, NA, nam)
+  return(nam)
+  })
+
+ds_data_scaled@data$Habitat = habs_vec
+
+
+# HDS Models --------------------------------------------------------
+
+# List the models
+
+# No spde models
+
+# Habitat
+
+cmp = ~ lsig + Intercept + Conifer + Mixed + Wetland
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat.RDS')
+
+
+# Habitat + elevation
+
+cmp = ~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland + Elevation
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_elev.RDS')
+
+# Habitat + Elevation + Spatial
+
+cmp = ~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_elev_spat.RDS')
+
+# Human presence
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human.RDS')
+
+# Human presence + elevation
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Elevation
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Elevation
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_elev.RDS')
+
+# Human presence + elevation + spatial
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Elevation + Northing + Easting
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_elev_spat.RDS')
+
+# Spde models
+
+# Habitat + spde
+cmp = ~ mySPDE(map = coordinates, model = matern) +
+  lsig + Intercept + Conifer + Mixed + Wetland
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_spde.RDS')
+
+# Habitat + elevation + spde
+
+cmp = ~ mySPDE(map = coordinates, model = matern) +
+  lsig + Intercept + Conifer + Mixed + Wetland + Elevation
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland + Elevation
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_elev_spde.RDS')
+
+# Habitat + elevation + spatial + spde
+
+cmp = ~ mySPDE(map = coordinates, model = matern) +
+  lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_elev_spatial_spde.RDS')
+
+# Human + spde
+
+cmp = ~ mySPDE(map = coordinates, model = matern) +
+  lsig + Intercept + Highway + MinorRoad
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_spde.RDS')
+
+# Human + elev + spde
+
+cmp = ~ mySPDE(map = coordinates, model = matern) +
+  lsig + Intercept + Highway + MinorRoad + Elevation
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Elevation
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_elev_spde.RDS')
+
+# Human + elev + spde + spat
+
+cmp = ~ mySPDE(map = coordinates, model = matern) +
+  lsig + Intercept + Highway + MinorRoad + Elevation + Northing + Easting
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/human_elev_spatial_spde.RDS')
+
+# Habitat + human
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human.RDS')
+
+# habitat_human_spde
+
+cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_spde.RDS')
+
+# habitat_human_elev
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev.RDS')
+
+# habitat_human_elev_spde
+
+cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + 
+  Conifer + Mixed + Wetland + Elevation
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev_spde.RDS')
+
+# habitat_human_elev_spat
+
+
+cmp = ~ lsig + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + 
+  Elevation + Northing + Easting
+
+formula = coordinates + distance ~
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev_spat.RDS')
+
+# habitat_human_elev_spat_spde
+
+cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + 
+  Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+formula = coordinates + distance ~ mySPDE +
+  log(hn(distance, lsig)) +
+  log(1/W) +
+  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+
+fit = lgcp(components = cmp,
+           data = ds_data_sp,
+           samplers = deer_transects_2018,
+           formula = formula)
+
+summary(fit)
+
+saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev_spde.RDS')
+
+# # # # # # # # # # # # # # # # # # # # # # # # 
+# Summarize model results #####################
+# # # # # # # # # # # # # # # # # # # # # # # # 
+
+
+# Summaries f magna -------------------------------------
+
+m_out = list.files('model_outputs/fmagna/', full.names = T)
+
+for(m in m_out){
+  load(m)
+}
+
+mod_list = list(
+  'null_model_ls'             = null_model_ls,
+  'full_model_ls'             = full_model_ls,
+  'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
+  'red_mod_spatial_ls'        = red_mod_spatial_ls,
+  'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
+  'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
+  'red_mod_survival_ls'       = red_mod_survival_ls
+)
+
+
+aic_vals_fmagna = sapply(mod_list, aicFunc)
+
+aic_vals_fmagna = data.frame("model" = names(mod_list), "waic" = aic_vals_fmagna) %>% arrange(waic)
+
+rm(list = mod_list %>% names) ; gc()
+
+aic_vals_fmagna
+
+# Summaries p tenuis models -------------------------------------------------
+
+m_out = list.files('model_outputs/ptenuis/', full.names = T)
+
+for(m in m_out){
+  load(m)
+}
+
+mod_list = list(
+  'null_model_ls'             = null_model_ls,
+  'full_model_ls'             = full_model_ls,
+  'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
+  'red_mod_spatial_ls'        = red_mod_spatial_ls,
+  'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
+  'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
+  'red_mod_survival_ls'       = red_mod_survival_ls
+)
+
+
+aic_vals_ptenuis = sapply(mod_list, aicFunc)
+
+aic_vals_ptenuis = data.frame("model" = names(mod_list), "waic" = aic_vals_ptenuis) %>% arrange(waic)
+
+rm(list = mod_list %>% names) ; gc()
+
+aic_vals_ptenuis
+
+# Summaries hds ---------------------------------------------
+
+hds_models = readr::read_csv('hds_models.csv')
+
+models_list = list.files(path = 'model_outputs/hds/', full.names = T)
+
+hds_models_name = hds_models$Name
+
+waic_ls = hds_model_waic(hds_models_name = hds_models_name, models_list = models_list)
+
+waic_vec = do.call(what = c, args = waic_ls)
+
+(waic_df = data.frame(model = names(waic_vec), waic = waic_vec, row.names = NULL) %>% arrange(waic))
+
+waic_df
+
+pxl = pixels(mesh = adk_mesh)
+
+habitat_human_elev_spat = readRDS('model_outputs/hds/habitat_human_elev_spat.RDS')
+
+prd = predict(object = habitat_human_elev_spat, 
+        pxl, 
+        formula = ~
+          log(hn(distance, lsig)) +
+          log(1/W) +
+          Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+)

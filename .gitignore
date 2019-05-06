@@ -3,3 +3,6 @@
 *.Rdata
 images/*
 inlabru_test.R
+.Rproj.user
+model_outputs/*
+
