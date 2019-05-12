@@ -16,7 +16,7 @@ library(dplyr)
 source('functions.R')
 load(file = 'scaled_covariates.Rdata')
 load(file = 'scaled_covariates_attr.Rdata')
-load(file = '.RData')
+# load(file = '.RData')
 
 # Load data ----------------------------------------
 
