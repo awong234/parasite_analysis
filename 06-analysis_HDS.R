@@ -1023,33 +1023,13 @@ plot(dfun)
 
 # Combine in with ds_data
 
-ds_data_sp@data = cbind.data.frame(ds_data_sp@data,
-                                   over(x = ds_data_sp, y = predict_grid))
-
-# Scale
-
 ds_data_scaled = ds_data_sp
 
-ds_data_scaled@data = ds_data_scaled@data %>%
-  mutate(Northing            = scale(Northing),
-         Easting             = scale(Easting),
-         Elevation           = scale(Elevation),
-         Precipitation       = scale(Precipitation),
-         Snow                = scale(Snow),
-         Distance_to_wetland = scale(Distance_to_wetland),
-         Highway             = scale(Highway),
-         MinorRoad           = scale(MinorRoad)
-         )
+ds_data_scaled@data = cbind.data.frame(ds_data_sp@data,
+                                       over(x = ds_data_sp, y = predict_grid_scaled))
 
-habs_frame = ds_data_scaled@data %>% select(Conifer:Wetland)
-
-habs_vec   = apply(X = habs_frame, MARGIN = 1, FUN = function(x){
-  nam = names(habs_frame)[which(x == 1)]
-  nam = ifelse(length(nam) == 0, NA, nam)
-  return(nam)
-  })
-
-ds_data_scaled@data$Habitat = habs_vec
+ds_data_sp@data = cbind.data.frame(ds_data_sp@data,
+                                   over(x = ds_data_sp, y = predict_grid))
 
 
 # HDS Models --------------------------------------------------------
