@@ -78,8 +78,6 @@ adk_mesh = inla.mesh.2d(boundary=boundary,
 
 load('predict_grid_1000.Rdata')
 
-predict_grid@data = predict_grid@data %>% select(Northing, Easting, Elevation)
-
 # Add new predictors
 
 # Add Precipitation --------------------------------------------------------
@@ -141,15 +139,25 @@ predict_grid@data$Distance_to_wetland = raster::extract(wetland_dist, predict_gr
 
 predict_grid_complete = predict_grid[complete.cases(predict_grid@data),]
 
-center = covariate_scaled_attr$Center[c(2,1,6,3,4,5)]
-scale  = covariate_scaled_attr$Scale[c(2,1,6,3,4,5)]
-
-temp = apply(X = predict_grid_complete@data, MARGIN = 1, FUN = function(x){x - center}) %>% t
-temp = apply(X = temp, MARGIN = 1, FUN = function(x){x / scale}) %>% t %>% as.data.frame
+covariate_scaled_attr$covar = row.names(covariate_scaled_attr)
+rownames(covariate_scaled_attr) = NULL
 
 predict_grid_scaled = predict_grid_complete
-predict_grid_scaled@data = temp
 
+rel_cols = covariate_scaled_attr$covar
+
+# Center and scale 
+for(c in rel_cols){
+  print(c)
+  print(head(predict_grid_scaled@data[[c]]))
+  print(covariate_scaled_attr %>% filter(covar == c) %>% pull(Center))
+  print(covariate_scaled_attr %>% filter(covar == c) %>% pull(Scale))
+  # Center
+  predict_grid_scaled@data[[c]] = predict_grid_scaled@data[[c]] - covariate_scaled_attr %>% filter(covar == c) %>% pull(Center)
+  # Scale
+  predict_grid_scaled@data[[c]] = predict_grid_scaled@data[[c]] / covariate_scaled_attr %>% filter(covar == c) %>% pull(Scale)
+  
+}
 
 # List all models to run and run them! -----------------------------------------
 
