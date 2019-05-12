@@ -1480,14 +1480,26 @@ waic_vec = do.call(what = c, args = waic_ls)
 
 waic_df
 
-pxl = pixels(mesh = adk_mesh)
-
 habitat_human_elev_spat = readRDS('model_outputs/hds/habitat_human_elev_spat.RDS')
 
-prd = predict(object = habitat_human_elev_spat, 
-        pxl, 
-        formula = ~
-          log(hn(distance, lsig)) +
-          log(1/W) +
-          Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+prd = stats::predict(object = habitat_human_elev_spat, 
+        predict_grid_complete, 
+        formula = ~ Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
 )
+
+ggplot(data = prd@data) + 
+  geom_raster(aes(x = coordinates(prd)[,1], y = coordinates(prd)[,2], fill = mean)) + 
+  coord_equal()
+
+##
+
+habitat_human = readRDS('model_outputs/hds/habitat_human.RDS')
+
+prd = stats::predict(object = habitat_human, 
+                     predict_grid, 
+                     formula = ~ Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+)
+
+ggplot(data = prd@data) + 
+  geom_raster(aes(x = coordinates(prd)[,1], y = coordinates(prd)[,2], fill = mean)) + 
+  coord_equal()
