@@ -1069,12 +1069,14 @@ ds_data_scaled@data$Habitat = habs_vec
 
 # Habitat
 
-cmp = ~ lsig + Intercept + Conifer + Mixed + Wetland
+cmp = ~ lsig + Intercept + 
+  b.Conifer(map = Conifer, model = 'linear') + 
+  b.mixed(map = Mixed, model = 'linear') + Wetland
 
 formula = coordinates + distance ~
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Conifer + Mixed + Wetland
+  Intercept + b.Conifer + Mixed + Wetland
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1088,12 +1090,12 @@ saveRDS(fit, file = 'model_outputs/hds/habitat.RDS')
 
 # Habitat + elevation
 
-cmp = ~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation
+cmp = ~ lsig + Intercept + b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland + Elevation
 
 formula = coordinates + distance ~
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Conifer + Mixed + Wetland + Elevation
+  Intercept + b.Conifer + Mixed + Wetland + Elevation
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1106,12 +1108,12 @@ saveRDS(fit, file = 'model_outputs/hds/habitat_elev.RDS')
 
 # Habitat + Elevation + Spatial
 
-cmp = ~ lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+cmp = ~ lsig + Intercept + b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland + Elevation + Northing + Easting
 
 formula = coordinates + distance ~
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+  Intercept + b.Conifer + Mixed + Wetland + Elevation + Northing + Easting
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1180,12 +1182,12 @@ saveRDS(fit, file = 'model_outputs/hds/human_elev_spat.RDS')
 
 # Habitat + spde
 cmp = ~ mySPDE(map = coordinates, model = matern) +
-  lsig + Intercept + Conifer + Mixed + Wetland
+  lsig + Intercept + b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland
 
 formula = coordinates + distance ~ mySPDE +
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Conifer + Mixed + Wetland
+  Intercept + b.Conifer + Mixed + Wetland
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1199,12 +1201,12 @@ saveRDS(fit, file = 'model_outputs/hds/habitat_spde.RDS')
 # Habitat + elevation + spde
 
 cmp = ~ mySPDE(map = coordinates, model = matern) +
-  lsig + Intercept + Conifer + Mixed + Wetland + Elevation
+  lsig + Intercept + b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland + Elevation
 
 formula = coordinates + distance ~ mySPDE +
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Conifer + Mixed + Wetland + Elevation
+  Intercept + b.Conifer + Mixed + Wetland + Elevation
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1218,12 +1220,12 @@ saveRDS(fit, file = 'model_outputs/hds/habitat_elev_spde.RDS')
 # Habitat + elevation + spatial + spde
 
 cmp = ~ mySPDE(map = coordinates, model = matern) +
-  lsig + Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+  lsig + Intercept + b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland + Elevation + Northing + Easting
 
 formula = coordinates + distance ~ mySPDE +
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+  Intercept + b.Conifer + Mixed + Wetland + Elevation + Northing + Easting
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1293,12 +1295,12 @@ saveRDS(fit, file = 'model_outputs/hds/human_elev_spatial_spde.RDS')
 
 # Habitat + human
 
-cmp = ~ lsig + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+cmp = ~ lsig + Intercept + Highway + MinorRoad + b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland
 
 formula = coordinates + distance ~
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+  Intercept + Highway + MinorRoad + b.Conifer + Mixed + Wetland
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1311,12 +1313,12 @@ saveRDS(fit, file = 'model_outputs/hds/habitat_human.RDS')
 
 # habitat_human_spde
 
-cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland
 
 formula = coordinates + distance ~ mySPDE +
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+  Intercept + Highway + MinorRoad + b.Conifer + Mixed + Wetland
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1329,12 +1331,12 @@ saveRDS(fit, file = 'model_outputs/hds/habitat_human_spde.RDS')
 
 # habitat_human_elev
 
-cmp = ~ lsig + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation
+cmp = ~ lsig + Intercept + Highway + MinorRoad + b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland + Elevation
 
 formula = coordinates + distance ~
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation
+  Intercept + Highway + MinorRoad + b.Conifer + Mixed + Wetland + Elevation
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1348,12 +1350,12 @@ saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev.RDS')
 # habitat_human_elev_spde
 
 cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + 
-  Conifer + Mixed + Wetland + Elevation
+  b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland + Elevation
 
 formula = coordinates + distance ~ mySPDE +
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation
+  Intercept + Highway + MinorRoad + b.Conifer + Mixed + Wetland + Elevation
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1367,13 +1369,13 @@ saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev_spde.RDS')
 # habitat_human_elev_spat
 
 
-cmp = ~ lsig + Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + 
+cmp = ~ lsig + Intercept + Highway + MinorRoad + b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland + 
   Elevation + Northing + Easting
 
 formula = coordinates + distance ~
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+  Intercept + Highway + MinorRoad + b.Conifer + Mixed + Wetland + Elevation + Northing + Easting
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
@@ -1387,12 +1389,12 @@ saveRDS(fit, file = 'model_outputs/hds/habitat_human_elev_spat.RDS')
 # habitat_human_elev_spat_spde
 
 cmp = ~ lsig + mySPDE(map = coordinates, model = matern) + Intercept + Highway + MinorRoad + 
-  Conifer + Mixed + Wetland + Elevation + Northing + Easting
+  b.Conifer(map = Conifer, model = 'linear') + Mixed + Wetland + Elevation + Northing + Easting
 
 formula = coordinates + distance ~ mySPDE +
   log(hn(distance, lsig)) +
   log(1/W) +
-  Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+  Intercept + Highway + MinorRoad + b.Conifer + Mixed + Wetland + Elevation + Northing + Easting
 
 fit = lgcp(components = cmp,
            data = ds_data_sp,
