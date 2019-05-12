@@ -16,7 +16,7 @@ library(dplyr)
 source('functions.R')
 load(file = 'scaled_covariates.Rdata')
 load(file = 'scaled_covariates_attr.Rdata')
-load(file = '.RData')
+# load(file = '.RData')
 
 # Load data ----------------------------------------
 
@@ -77,8 +77,6 @@ adk_mesh = inla.mesh.2d(boundary=boundary,
 # Load prediction grid --------------------------------------------------------------
 
 load('predict_grid_1000.Rdata')
-
-predict_grid@data = predict_grid@data %>% select(Northing, Easting, Elevation)
 
 # Add new predictors
 
@@ -141,15 +139,25 @@ predict_grid@data$Distance_to_wetland = raster::extract(wetland_dist, predict_gr
 
 predict_grid_complete = predict_grid[complete.cases(predict_grid@data),]
 
-center = covariate_scaled_attr$Center[c(2,1,6,3,4,5)]
-scale  = covariate_scaled_attr$Scale[c(2,1,6,3,4,5)]
-
-temp = apply(X = predict_grid_complete@data, MARGIN = 1, FUN = function(x){x - center}) %>% t
-temp = apply(X = temp, MARGIN = 1, FUN = function(x){x / scale}) %>% t %>% as.data.frame
+covariate_scaled_attr$covar = row.names(covariate_scaled_attr)
+rownames(covariate_scaled_attr) = NULL
 
 predict_grid_scaled = predict_grid_complete
-predict_grid_scaled@data = temp
 
+rel_cols = covariate_scaled_attr$covar
+
+# Center and scale 
+for(c in rel_cols){
+  print(c)
+  print(head(predict_grid_scaled@data[[c]]))
+  print(covariate_scaled_attr %>% filter(covar == c) %>% pull(Center))
+  print(covariate_scaled_attr %>% filter(covar == c) %>% pull(Scale))
+  # Center
+  predict_grid_scaled@data[[c]] = predict_grid_scaled@data[[c]] - covariate_scaled_attr %>% filter(covar == c) %>% pull(Center)
+  # Scale
+  predict_grid_scaled@data[[c]] = predict_grid_scaled@data[[c]] / covariate_scaled_attr %>% filter(covar == c) %>% pull(Scale)
+  
+}
 
 # List all models to run and run them! -----------------------------------------
 
@@ -1478,14 +1486,26 @@ waic_vec = do.call(what = c, args = waic_ls)
 
 waic_df
 
-pxl = pixels(mesh = adk_mesh)
-
 habitat_human_elev_spat = readRDS('model_outputs/hds/habitat_human_elev_spat.RDS')
 
-prd = predict(object = habitat_human_elev_spat, 
-        pxl, 
-        formula = ~
-          log(hn(distance, lsig)) +
-          log(1/W) +
-          Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
+prd = stats::predict(object = habitat_human_elev_spat, 
+        predict_grid_complete, 
+        formula = ~ Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
 )
+
+ggplot(data = prd@data) + 
+  geom_raster(aes(x = coordinates(prd)[,1], y = coordinates(prd)[,2], fill = mean)) + 
+  coord_equal()
+
+##
+
+habitat_human = readRDS('model_outputs/hds/habitat_human.RDS')
+
+prd = stats::predict(object = habitat_human, 
+                     predict_grid, 
+                     formula = ~ Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
+)
+
+ggplot(data = prd@data) + 
+  geom_raster(aes(x = coordinates(prd)[,1], y = coordinates(prd)[,2], fill = mean)) + 
+  coord_equal()
