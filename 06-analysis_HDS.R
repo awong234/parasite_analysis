@@ -1021,23 +1021,6 @@ plot(dfun)
 # Null model is meaningless here, since it will be multiplied against parasite models. Will be using
 # covariate models only.
 
-# Obtain habitat covariates
-
-predict_grid_bak = predict_grid
-
-load('predict_grid_1000.Rdata')
-
-predict_grid@data = cbind.data.frame(predict_grid_bak@data,
-                                     predict_grid@data %>%
-                                       select(Highway,
-                                              MinorRoad,
-                                              Conifer,
-                                              Deciduous,
-                                              Mixed,
-                                              Wetland))
-
-rm(predict_grid_bak); gc()
-
 # Combine in with ds_data
 
 ds_data_sp@data = cbind.data.frame(ds_data_sp@data,
