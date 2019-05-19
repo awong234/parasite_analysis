@@ -1445,30 +1445,36 @@ waic_ls = hds_model_waic(hds_models_name = hds_models_name, models_list = models
 
 waic_vec = do.call(what = c, args = waic_ls)
 
-(waic_df = data.frame(model = names(waic_vec), waic = waic_vec, row.names = NULL) %>% arrange(waic))
+waic_df = data.frame(model = names(waic_vec), waic = waic_vec, row.names = NULL) %>% arrange(waic)
 
 waic_df
+
+## 
 
 habitat_human_elev_spat = readRDS('model_outputs/hds/habitat_human_elev_spat.RDS')
 
 prd = stats::predict(object = habitat_human_elev_spat, 
-        predict_grid_complete, 
+        predict_grid_scaled, 
         formula = ~ Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland + Elevation + Northing + Easting
 )
 
 ggplot(data = prd@data) + 
-  geom_raster(aes(x = coordinates(prd)[,1], y = coordinates(prd)[,2], fill = mean)) + 
-  coord_equal()
+  geom_raster(aes(x = coordinates(prd)[,1], y = coordinates(prd)[,2], fill = mean)) +
+  scale_fill_viridis(option = 'A') +
+  coord_equal() + theme_bw() + 
+  ggtitle("Hab hum elev spat")
 
 ##
 
 habitat_human = readRDS('model_outputs/hds/habitat_human.RDS')
 
 prd = stats::predict(object = habitat_human, 
-                     predict_grid, 
+                     predict_grid_scaled, 
                      formula = ~ Intercept + Highway + MinorRoad + Conifer + Mixed + Wetland
 )
 
 ggplot(data = prd@data) + 
   geom_raster(aes(x = coordinates(prd)[,1], y = coordinates(prd)[,2], fill = mean)) + 
-  coord_equal()
+  scale_fill_viridis(option = 'A') +
+  coord_equal() + theme_bw() + 
+  ggtitle("Hab hum")
