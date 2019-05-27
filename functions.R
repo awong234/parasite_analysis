@@ -4,6 +4,7 @@
 
 hds_model_waic = function(hds_models_name, models_list) {
   aic_list = vector(mode = 'list', length = length(hds_models_name))
+  names(aic_list) = hds_models_name
   for(name in hds_models_name){
     mod_to_load = models_list[grep(models_list, pattern = paste0("\\/",name, "\\."), ignore.case = T)]
     if(length(mod_to_load) == 0){next}
