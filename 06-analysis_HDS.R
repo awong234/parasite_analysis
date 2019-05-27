@@ -229,7 +229,7 @@ spde <- inla.spde2.pcmatern(
 
 # Null model -------------------------------
 
-null_model = inla(formula = f_magna_models$null_model, family = 'nbinomial', data = data, control.compute = list(waic = TRUE))
+null_model = inla(formula = f_magna_models$null_model, family = 'nbinomial', data = data, control.compute = list(waic = TRUE, cpo  = TRUE))
 
 null_model_ls = list(
   "data_stack" = NA,
@@ -295,7 +295,8 @@ save(null_model_ls, file = "model_outputs/null_model.Rdata")
 full_model = inla(formula = f_magna_models$full_model,
                   family = 'nbinomial',
                   data = inla.stack.data(stk),
-                  control.compute = list(waic = TRUE),
+                  control.compute = list(waic = TRUE,
+                                         cpo  = TRUE),
                   control.predictor = list(A = inla.stack.A(stk))
                   )
 
@@ -355,7 +356,7 @@ save(full_model_ls, file = "model_outputs/full_model.Rdata")
 full_model_elev_rw = inla(formula = f_magna_models$full_model_elev_rw,
                           family = 'nbinomial',
                           data = inla.stack.data(stk),
-                          control.compute = list(waic = TRUE),
+                          control.compute = list(waic = TRUE, cpo  = TRUE),
                           control.predictor = list(A = inla.stack.A(stk))
 )
 
@@ -413,7 +414,7 @@ save(full_model_elev_rw_ls, file = "model_outputs/full_model_elev_rw_ls.Rdata")
 red_mod_minus_speff = inla(formula = f_magna_models$red_mod_minus_speff,
                           family = 'nbinomial',
                           data = inla.stack.data(stk),
-                          control.compute = list(waic = TRUE),
+                          control.compute = list(waic = TRUE, cpo  = TRUE),
                           control.predictor = list(A = inla.stack.A(stk))
 )
 
@@ -433,7 +434,7 @@ save(red_mod_minus_speff_ls, file = "model_outputs/red_mod_minus_speff_ls.Rdata"
 red_mod_linear_all_cov = inla(formula = f_magna_models$red_mod_linear_all_cov,
                               family = 'nbinomial',
                               data = data,
-                              control.compute = list(waic = TRUE)
+                              control.compute = list(waic = TRUE, cpo  = TRUE)
                               )
 
 red_mod_linear_all_cov_ls = list(
@@ -450,7 +451,7 @@ save(red_mod_linear_all_cov_ls, file = 'model_outputs/red_mod_linear_all_cov_ls.
 red_mod_survival = inla(formula = f_magna_models$red_mod_survival,
                               family = 'nbinomial',
                               data = data,
-                              control.compute = list(waic = TRUE)
+                              control.compute = list(waic = TRUE, cpo  = TRUE)
 )
 
 red_mod_survival_ls = list(
@@ -502,7 +503,7 @@ save(red_mod_survival_ls, file = 'model_outputs/red_mod_survival_ls.Rdata')
 red_mod_spatial = inla(formula = f_magna_models$red_mod_spatial,
                   family = 'nbinomial',
                   data = inla.stack.data(stk),
-                  control.compute = list(waic = TRUE),
+                  control.compute = list(waic = TRUE, cpo  = TRUE),
                   control.predictor = list(A = inla.stack.A(stk))
 )
 
@@ -557,7 +558,7 @@ save(red_mod_spatial_ls, file = "model_outputs/red_mod_spatial.Rdata")
 red_mod_spatial_elev_elev = inla(formula = f_magna_models$red_mod_spatial_elev_elev,
                        family = 'nbinomial',
                        data = inla.stack.data(stk),
-                       control.compute = list(waic = TRUE),
+                       control.compute = list(waic = TRUE, cpo  = TRUE),
                        control.predictor = list(A = inla.stack.A(stk))
 )
 
@@ -604,7 +605,7 @@ p_tenuis_models[['red_mod_spatial_elev']] = as.formula("dsl_mb ~ Easting + North
 
 # P tenuis Null model -------------------------------
 
-null_model = inla(formula = p_tenuis_models$null_model, family = 'nbinomial', data = data, control.compute = list(waic = TRUE))
+null_model = inla(formula = p_tenuis_models$null_model, family = 'nbinomial', data = data, control.compute = list(waic = TRUE, cpo  = TRUE))
 
 null_model_ls = list(
   "data_stack" = NA,
@@ -670,7 +671,7 @@ save(null_model_ls, file = "model_outputs/ptenuis/null_model.Rdata")
 full_model = inla(formula = p_tenuis_models$full_model,
                   family = 'nbinomial',
                   data = inla.stack.data(stk),
-                  control.compute = list(waic = TRUE),
+                  control.compute = list(waic = TRUE, cpo  = TRUE),
                   control.predictor = list(A = inla.stack.A(stk))
 )
 
@@ -730,7 +731,7 @@ save(full_model_ls, file = "model_outputs/ptenuis/full_model.Rdata")
 full_model_elev_rw = inla(formula = p_tenuis_models$full_model_elev_rw,
                           family = 'nbinomial',
                           data = inla.stack.data(stk),
-                          control.compute = list(waic = TRUE),
+                          control.compute = list(waic = TRUE, cpo  = TRUE),
                           control.predictor = list(A = inla.stack.A(stk))
 )
 
@@ -788,7 +789,7 @@ save(full_model_elev_rw_ls, file = "model_outputs/ptenuis/full_model_elev_rw_ls.
 red_mod_minus_speff = inla(formula = p_tenuis_models$red_mod_minus_speff,
                            family = 'nbinomial',
                            data = inla.stack.data(stk),
-                           control.compute = list(waic = TRUE),
+                           control.compute = list(waic = TRUE, cpo  = TRUE),
                            control.predictor = list(A = inla.stack.A(stk))
 )
 
@@ -807,7 +808,7 @@ save(red_mod_minus_speff_ls, file = "model_outputs/ptenuis/red_mod_minus_speff_l
 red_mod_linear_all_cov = inla(formula = p_tenuis_models$red_mod_linear_all_cov,
                               family = 'nbinomial',
                               data = data,
-                              control.compute = list(waic = TRUE)
+                              control.compute = list(waic = TRUE, cpo  = TRUE)
 )
 
 red_mod_linear_all_cov_ls = list(
@@ -824,7 +825,7 @@ save(red_mod_linear_all_cov_ls, file = 'model_outputs/ptenuis/red_mod_linear_all
 red_mod_survival = inla(formula = p_tenuis_models$red_mod_survival,
                         family = 'nbinomial',
                         data = data,
-                        control.compute = list(waic = TRUE)
+                        control.compute = list(waic = TRUE, cpo  = TRUE)
 )
 
 red_mod_survival_ls = list(
@@ -875,7 +876,7 @@ save(red_mod_survival_ls, file = 'model_outputs/ptenuis/red_mod_survival_ls.Rdat
 red_mod_spatial = inla(formula = p_tenuis_models$red_mod_spatial,
                        family = 'nbinomial',
                        data = inla.stack.data(stk),
-                       control.compute = list(waic = TRUE),
+                       control.compute = list(waic = TRUE, cpo  = TRUE),
                        control.predictor = list(A = inla.stack.A(stk))
 )
 
@@ -930,7 +931,7 @@ save(red_mod_spatial_ls, file = "model_outputs/ptenuis/red_mod_spatial.Rdata")
 red_mod_spatial_elev_elev = inla(formula = p_tenuis_models$red_mod_spatial_elev,
                                  family = 'nbinomial',
                                  data = inla.stack.data(stk),
-                                 control.compute = list(waic = TRUE),
+                                 control.compute = list(waic = TRUE, cpo  = TRUE),
                                  control.predictor = list(A = inla.stack.A(stk))
 )
 
