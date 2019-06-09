@@ -47,8 +47,8 @@ data = data[complete.cases(data %>% select(fmagna_ff, dsl_mb, Easting:Distance_t
 
 # Change data to binary
 
-data %<>% mutate(fmagna_ff_occ = fmagna_ff > 0,
-                 dsl_mb_occ    = dsl_mb > 0)
+data %<>% mutate(fmagna_ff = as.integer(fmagna_ff > 0),
+                 dsl_mb    = as.integer(dsl_mb > 0))
 
 
 
@@ -166,3 +166,83 @@ for(c in rel_cols){
   predict_grid_scaled@data[[c]] = predict_grid_scaled@data[[c]] / covariate_scaled_attr %>% filter(covar == c) %>% pull(Scale)
   
 }
+
+
+# List all models to run and run them! -----------------------------------------
+
+f_magna_models = list()
+
+# Null model
+
+f_magna_models[['null_model']] = as.formula("fmagna_ff ~ 1")
+
+# Full model with spatial effect
+f_magna_models[['full_model']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation + f(i, model = spde)")
+
+# Full model with elevation random walk
+f_magna_models[['full_model_elev_rw']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1') + f(i, model = spde)")
+
+# Reduced models
+
+# Remove spatial effect, all covariates and rw elevation
+f_magna_models[['red_mod_minus_speff']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1')")
+
+# Remove elevation rw; linear in all covariates
+f_magna_models[['red_mod_linear_all_cov']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation")
+
+# Survival hypothesis -- precip, snow, wetland
+f_magna_models[['red_mod_survival']] = as.formula("fmagna_ff ~ Precipitation + Snow + Distance_to_wetland")
+
+# No survival -- large-scale and small-scale spatial variation
+
+f_magna_models[['red_mod_spatial']] = as.formula("fmagna_ff ~ Easting + Northing + f(i, model = spde)")
+
+# No survival -- with linear elevation also
+
+f_magna_models[['red_mod_spatial_elev']] = as.formula("fmagna_ff ~ Easting + Northing + f(i, model = spde) + Elevation")
+
+#'###############################################
+# MODEL RUNS ###################################
+#'###############################################
+#
+#
+
+# Make the A matrices and spde for all subsequent stacks
+boundary <- list(
+  inla.nonconvex.hull(coordinates(data_sp), 10000),
+  inla.nonconvex.hull(coordinates(data_sp), 30000))
+
+
+adk_mesh = inla.mesh.2d(boundary=boundary,
+                        max.edge=c(2000, 5400),
+                        min.angle=c(30, 21),
+                        max.n=c(48000, 16000), ## Safeguard against large meshes.
+                        max.n.strict=c(128000, 128000), ## Don't build a huge mesh!
+                        cutoff=1050, ## Filter away adjacent points.
+                        offset=c(5200, 15000)) ## Offset for extra boundaries, if needed.
+
+projector_A = inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
+predictor_A = inla.spde.make.A(adk_mesh, loc = predict_grid_scaled@coords)
+
+
+spde <- inla.spde2.pcmatern(
+  mesh = adk_mesh,
+  alpha = 2,
+  ### mesh and smoothness parameter
+  prior.range = c(1000, 0.01),
+  ### P(practic.range<0.3)=0.5
+  prior.sigma = c(1, 0.01)
+  ### P(sigma>1)=0.01
+)
+
+# Null model -------------------------------
+
+null_model = inla(formula = f_magna_models$null_model, family = 'binomial', data = data, control.compute = list(waic = TRUE, cpo  = TRUE))
+
+null_model_ls = list(
+  "data_stack" = NA,
+  "join_stack" = NA,
+  "model"      = null_model
+)
+
+save(null_model_ls, file = "model_outputs/logreg/fmagna/null_model.Rdata")
