@@ -137,11 +137,17 @@ snowcover_means = snowcover_data %>% rowMeans()
 
 predict_grid@data$Snow = snowcover_means
 
-# Add wetland distance
+# # No longer interested in distance to wetland now that we have geomorphon
+# # Add wetland distance
+# 
+# wetland_dist = raster::raster('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif')
+# 
+# predict_grid@data$Distance_to_wetland = raster::extract(wetland_dist, predict_grid)
 
-wetland_dist = raster::raster('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif')
+# Add geomorphon
 
-predict_grid@data$Distance_to_wetland = raster::extract(wetland_dist, predict_grid)
+geomorphon = raster::raster('../../GIS/geomorphon/geomorphon_40.tif')
+predict_grid@data$geomorphon = raster::extract(geomorphon, predict_grid, method = 'simple', fun =)
 
 # Scale prediction
 
@@ -164,8 +170,8 @@ for(c in rel_cols){
   predict_grid_scaled@data[[c]] = predict_grid_scaled@data[[c]] - covariate_scaled_attr %>% filter(covar == c) %>% pull(Center)
   # Scale
   predict_grid_scaled@data[[c]] = predict_grid_scaled@data[[c]] / covariate_scaled_attr %>% filter(covar == c) %>% pull(Scale)
-  
 }
+
 
 
 # List all models to run and run them! -----------------------------------------
@@ -177,21 +183,21 @@ f_magna_models = list()
 f_magna_models[['null_model']] = as.formula("fmagna_ff ~ 1")
 
 # Full model with spatial effect
-f_magna_models[['full_model']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation + f(i, model = spde)")
+f_magna_models[['full_model']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation + f(i, model = spde)")
 
 # Full model with elevation random walk
-f_magna_models[['full_model_elev_rw']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1') + f(i, model = spde)")
+f_magna_models[['full_model_elev_rw']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1') + f(i, model = spde)")
 
 # Reduced models
 
 # Remove spatial effect, all covariates and rw elevation
-f_magna_models[['red_mod_minus_speff']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1')")
+f_magna_models[['red_mod_minus_speff']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1')")
 
 # Remove elevation rw; linear in all covariates
-f_magna_models[['red_mod_linear_all_cov']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation")
+f_magna_models[['red_mod_linear_all_cov']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation")
 
 # Survival hypothesis -- precip, snow, wetland
-f_magna_models[['red_mod_survival']] = as.formula("fmagna_ff ~ Precipitation + Snow + Distance_to_wetland")
+f_magna_models[['red_mod_survival']] = as.formula("fmagna_ff ~ Precipitation + Snow + geomorphon")
 
 # No survival -- large-scale and small-scale spatial variation
 
