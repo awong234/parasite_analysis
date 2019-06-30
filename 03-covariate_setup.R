@@ -209,6 +209,24 @@ dist_to_wetland_data[!na_location_index] = extraction
 metadata$Distance_to_wetland = dist_to_wetland_data
 covariate$Distance_to_wetland = dist_to_wetland_data
 
+
+# Prep geomorphon data ----------------------------------------------------------------
+
+files = c('../../GIS/geomorphon/geomorphon_40.tif', '../../GIS/geomorphon/geomorphon_20.tif')
+names = regmatches(x = files, m = regexpr(pattern = '\\w+(?=\\.)', text = files, ignore.case = T, perl = T))
+
+
+for(f in seq_along(files)){
+  geomorphon = raster::raster(files[f])
+  geomorph_data = raster::extract(geomorphon, metadata_sp)
+  metadata[!na_location_index, names[f]] = geomorph_data
+}
+
+var(metadata$geomorphon_20, na.rm = T)
+var(metadata$geomorphon_40, na.rm = T)
+
+# Save covariates
+
 cor(covariate, use = 'complete.obs')
 
 save(covariate, file = 'raw_covariates.Rdata')
