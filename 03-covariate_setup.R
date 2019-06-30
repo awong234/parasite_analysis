@@ -123,91 +123,91 @@ metadata$Elevation = elev_data
 covariate$Elevation = elev_data
 
 # Prep dist to wetland data --------------------------------------------------
-
-# IF it exists already, load it.
-
-if(file.exists('../../GIS/NY_shapefile_wetlands/Dist_to_wetlands.Rdata')){
-  
-  load('../../GIS/NY_shapefile_wetlands/Dist_to_wetlands.Rdata')
-  
-} else {
-  
-  # Make a raster upon which to calculate distance to nearest wetland boundary
-  
-  cellSize = 1000
-  
-  # Load adk boundary
-  
-  rgdal::ogrListLayers('../../GIS/adkParkPoly/adkParkPoly.shp')
-  
-  adkbound = rgdal::readOGR(dsn = '../../GIS/adkParkPoly/adkParkPoly.shp')
-  
-  # Load uninhabitable areas
-  
-  uhm = rgdal::readOGR(dsn = '../../GIS/uninhabitable_mask/uninhabitable_mask.shp')
-  
-  predict_grid = makegrid(x = adkbound, cellsize = cellSize) %>% rename(x = x1, y = x2)
-  
-  coordinates(predict_grid) = ~x + y
-  proj4string(predict_grid) = proj4string(adkbound)
-  # Promote to spatialgriddataframe
-  gridded(predict_grid) = TRUE
-  predict_grid = as(predict_grid, "SpatialGrid")
-  
-  # Convert to raster to mask by polygons
-  predict_grid = raster::raster(predict_grid)
-  predict_grid[] = 1
-  predict_grid = raster::mask(x = predict_grid, mask = adkbound)
-  
-  predict_grid_raster = raster::mask(x = predict_grid, mask = uhm, inverse = T)
-  
-  # Convert back to grid
-  
-  predict_grid = as(predict_grid_raster, 'SpatialPointsDataFrame')
-  predict_grid = predict_grid[!is.na(predict_grid@data$layer),]
-  gridded(predict_grid) = T
-  summary(predict_grid)
-  plot(predict_grid)
-  
-  # Obtain wetland features
-  
-  wetlands = rgdal::readOGR(dsn = '../../GIS/NY_shapefile_wetlands/NY_shapefile_wetlands_proj_clip.shp')
-  
-  # Condense into a single feature
-  
-  wetlands_union = rgeos::gUnaryUnion(wetlands)
-  
-  # Calculate distance to nearest wetland feature, upon grid
-  
-  dists = rgeos::gDistance(spgeom1 = wetlands_union, spgeom2 = as(predict_grid, "SpatialPoints"), byid = T)
-  
-  save('dists', file = '../../GIS/NY_shapefile_wetlands/Dist_to_wetlands.Rdata')
-  
-  
-}
-
-if(file.exists('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif')){
-  
-  dist_to_wetland_rast = raster::raster('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif')
-  
-} else {
-  
-  dist_to_wetland_rast = predict_grid_raster
-  
-  dist_to_wetland_rast[dist_to_wetland_rast > 0] = dists
-  
-  raster::writeRaster(dist_to_wetland_rast, filename = '../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif', format = 'GTiff')
-  
-}
-
-dist_to_wetland_data = rep(NA, nrow(metadata))
-extraction = raster::extract(dist_to_wetland_rast, metadata_sp)
-extraction[is.na(extraction)] = 0
-
-dist_to_wetland_data[!na_location_index] = extraction
-
-metadata$Distance_to_wetland = dist_to_wetland_data
-covariate$Distance_to_wetland = dist_to_wetland_data
+# 
+# # IF it exists already, load it.
+# 
+# if(file.exists('../../GIS/NY_shapefile_wetlands/Dist_to_wetlands.Rdata')){
+#   
+#   load('../../GIS/NY_shapefile_wetlands/Dist_to_wetlands.Rdata')
+#   
+# } else {
+#   
+#   # Make a raster upon which to calculate distance to nearest wetland boundary
+#   
+#   cellSize = 1000
+#   
+#   # Load adk boundary
+#   
+#   rgdal::ogrListLayers('../../GIS/adkParkPoly/adkParkPoly.shp')
+#   
+#   adkbound = rgdal::readOGR(dsn = '../../GIS/adkParkPoly/adkParkPoly.shp')
+#   
+#   # Load uninhabitable areas
+#   
+#   uhm = rgdal::readOGR(dsn = '../../GIS/uninhabitable_mask/uninhabitable_mask.shp')
+#   
+#   predict_grid = makegrid(x = adkbound, cellsize = cellSize) %>% rename(x = x1, y = x2)
+#   
+#   coordinates(predict_grid) = ~x + y
+#   proj4string(predict_grid) = proj4string(adkbound)
+#   # Promote to spatialgriddataframe
+#   gridded(predict_grid) = TRUE
+#   predict_grid = as(predict_grid, "SpatialGrid")
+#   
+#   # Convert to raster to mask by polygons
+#   predict_grid = raster::raster(predict_grid)
+#   predict_grid[] = 1
+#   predict_grid = raster::mask(x = predict_grid, mask = adkbound)
+#   
+#   predict_grid_raster = raster::mask(x = predict_grid, mask = uhm, inverse = T)
+#   
+#   # Convert back to grid
+#   
+#   predict_grid = as(predict_grid_raster, 'SpatialPointsDataFrame')
+#   predict_grid = predict_grid[!is.na(predict_grid@data$layer),]
+#   gridded(predict_grid) = T
+#   summary(predict_grid)
+#   plot(predict_grid)
+#   
+#   # Obtain wetland features
+#   
+#   wetlands = rgdal::readOGR(dsn = '../../GIS/NY_shapefile_wetlands/NY_shapefile_wetlands_proj_clip.shp')
+#   
+#   # Condense into a single feature
+#   
+#   wetlands_union = rgeos::gUnaryUnion(wetlands)
+#   
+#   # Calculate distance to nearest wetland feature, upon grid
+#   
+#   dists = rgeos::gDistance(spgeom1 = wetlands_union, spgeom2 = as(predict_grid, "SpatialPoints"), byid = T)
+#   
+#   save('dists', file = '../../GIS/NY_shapefile_wetlands/Dist_to_wetlands.Rdata')
+#   
+#   
+# }
+# 
+# if(file.exists('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif')){
+#   
+#   dist_to_wetland_rast = raster::raster('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif')
+#   
+# } else {
+#   
+#   dist_to_wetland_rast = predict_grid_raster
+#   
+#   dist_to_wetland_rast[dist_to_wetland_rast > 0] = dists
+#   
+#   raster::writeRaster(dist_to_wetland_rast, filename = '../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif', format = 'GTiff')
+#   
+# }
+# 
+# dist_to_wetland_data = rep(NA, nrow(metadata))
+# extraction = raster::extract(dist_to_wetland_rast, metadata_sp)
+# extraction[is.na(extraction)] = 0
+# 
+# dist_to_wetland_data[!na_location_index] = extraction
+# 
+# metadata$Distance_to_wetland = dist_to_wetland_data
+# covariate$Distance_to_wetland = dist_to_wetland_data
 
 
 # Prep geomorphon data ----------------------------------------------------------------
