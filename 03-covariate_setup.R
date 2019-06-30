@@ -218,12 +218,15 @@ names = regmatches(x = files, m = regexpr(pattern = '\\w+(?=\\.)', text = files,
 
 for(f in seq_along(files)){
   geomorphon = raster::raster(files[f])
-  geomorph_data = raster::extract(geomorphon, metadata_sp)
+  geomorph_data = as.integer(raster::extract(geomorphon, metadata_sp, method = 'simple'))
   metadata[!na_location_index, names[f]] = geomorph_data
+  covariate[!na_location_index, names[f]] = geomorph_data
 }
 
 var(metadata$geomorphon_20, na.rm = T)
 var(metadata$geomorphon_40, na.rm = T)
+hist(metadata$geomorphon_20, breaks = seq(1,9))
+hist(metadata$geomorphon_40, breaks = seq(1,9))
 
 # Save covariates
 
@@ -233,8 +236,12 @@ save(covariate, file = 'raw_covariates.Rdata')
 
 # Scale covariate data -------------------------------------------------------------------
 
-covariate_scaled = scale(covariate)
-covariate_scaled_df = as.data.frame(covariate_scaled)
+# Only scale numeric values; 
+
+integer_test = lapply(covariate, is.integer)
+
+covariate_scaled = scale(covariate[, integer_test == F])
+covariate_scaled_df = cbind(covariate_scaled, covariate[, integer_test == T])
 
 covariate_scaled_attr = data.frame(Center = attr(covariate_scaled, which = 'scaled:center'),
                                   Scale  = attr(covariate_scaled, which = 'scaled:scale')
