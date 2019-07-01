@@ -221,6 +221,12 @@ for(f in seq_along(files)){
   geomorph_data = as.integer(raster::extract(geomorphon, metadata_sp, method = 'simple'))
   metadata[!na_location_index, names[f]] = geomorph_data
   covariate[!na_location_index, names[f]] = geomorph_data
+  # Assign factor structure
+  covariate[,names[f]] = factor(covariate[, names[f]], levels = as.integer(seq(1,10)), labels = c('flat', 'summit', 'ridge', 'shoulder', 
+                                                                            'spur', 'slope', 'hollow', 'footslope',
+                                                                            'valley', 'depression'))
+  # Relevel to slope due to most data
+  covariate[,names[f]] = relevel(x = covariate[,names[f]], 'slope')
 }
 
 var(metadata$geomorphon_20, na.rm = T)
@@ -230,7 +236,7 @@ hist(metadata$geomorphon_40, breaks = seq(1,9))
 
 # Save covariates
 
-cor(covariate, use = 'complete.obs')
+# cor(covariate, use = 'complete.obs')
 
 save(covariate, file = 'raw_covariates.Rdata')
 
@@ -238,10 +244,10 @@ save(covariate, file = 'raw_covariates.Rdata')
 
 # Only scale numeric values; 
 
-integer_test = lapply(covariate, is.integer)
+num_test = sapply(covariate, is.numeric)
 
-covariate_scaled = scale(covariate[, integer_test == F])
-covariate_scaled_df = cbind(covariate_scaled, covariate[, integer_test == T])
+covariate_scaled = scale(covariate[, num_test])
+covariate_scaled_df = cbind(covariate_scaled, covariate[, num_test == F])
 
 covariate_scaled_attr = data.frame(Center = attr(covariate_scaled, which = 'scaled:center'),
                                   Scale  = attr(covariate_scaled, which = 'scaled:scale')
