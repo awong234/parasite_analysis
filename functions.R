@@ -137,25 +137,3 @@ getSnowFromDate = function(dates, snow_data, snow_dates){
   
 }
 
-# Deprecated ------------------
-
-# getPrecipFromDate = function(dates, precip_data, precip_dates){
-#   
-#   data_month = lubridate::month(dates)
-#   data_year  = lubridate::year(dates)
-#   data_dates = data.frame(year = data_year, month = data_month)
-#   
-#   n = nrow(data_dates)
-#   
-#   data_out = rep(NA_real_, n)
-#   
-#   for(i in 1:n){
-#     index = which(data_dates[i,'year'] == precip_dates$year & data_dates[i,'month'] - 1 == precip_dates$month)
-#     tryCatch(expr = {data_out[i]  = precip_data[i,index]},
-#              error = function(m){data_out[i] = NA; return(data_out[i])}
-#     )
-#   }
-#   
-#   return(data_out)
-#   
-# }

@@ -43,14 +43,19 @@ data = bind_cols(metadata_join %>% rename(Easting_real = Easting, Northing_real 
 
 # missing_data_rows = is.na(data$Easting) | is.na(data$Northing)
 
-data = data[complete.cases(data %>% select(fmagna_ff, dsl_mb, Easting:Distance_to_wetland)),]
+data = data[complete.cases(data %>% select(fmagna_ff, dsl_mb, Easting:geomorphon_20)),]
 
 # Change data to binary
 
 data %<>% mutate(fmagna_ff = as.integer(fmagna_ff > 0),
                  dsl_mb    = as.integer(dsl_mb > 0))
 
+# Select which geomorphon to use
+# Select 40-cell scale
 
+s_geomorph = 'geomorphon_40'
+
+data$geomorphon = data[, s_geomorph]
 
 # Data points as sp
 
@@ -137,11 +142,18 @@ snowcover_means = snowcover_data %>% rowMeans()
 
 predict_grid@data$Snow = snowcover_means
 
-# Add wetland distance
+# # No longer interested in distance to wetland now that we have geomorphon
+# # Add wetland distance
+# 
+# wetland_dist = raster::raster('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif')
+# 
+# predict_grid@data$Distance_to_wetland = raster::extract(wetland_dist, predict_grid)
 
-wetland_dist = raster::raster('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.tif')
+# Add geomorphon
+# use selection from before to parameterize
 
-predict_grid@data$Distance_to_wetland = raster::extract(wetland_dist, predict_grid)
+geomorphon = raster::raster(paste0('../../GIS/geomorphon/', s_geomorph, '.tif'))
+predict_grid@data$geomorphon = raster::extract(geomorphon, predict_grid, method = 'simple', fun =)
 
 # Scale prediction
 
@@ -164,8 +176,8 @@ for(c in rel_cols){
   predict_grid_scaled@data[[c]] = predict_grid_scaled@data[[c]] - covariate_scaled_attr %>% filter(covar == c) %>% pull(Center)
   # Scale
   predict_grid_scaled@data[[c]] = predict_grid_scaled@data[[c]] / covariate_scaled_attr %>% filter(covar == c) %>% pull(Scale)
-  
 }
+
 
 
 # List all models to run and run them! -----------------------------------------
@@ -177,21 +189,21 @@ f_magna_models = list()
 f_magna_models[['null_model']] = as.formula("fmagna_ff ~ 1")
 
 # Full model with spatial effect
-f_magna_models[['full_model']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation + f(i, model = spde)")
+f_magna_models[['full_model']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation + f(i, model = spde)")
 
 # Full model with elevation random walk
-f_magna_models[['full_model_elev_rw']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1') + f(i, model = spde)")
+f_magna_models[['full_model_elev_rw']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1') + f(i, model = spde)")
 
 # Reduced models
 
 # Remove spatial effect, all covariates and rw elevation
-f_magna_models[['red_mod_minus_speff']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1')")
+f_magna_models[['red_mod_minus_speff']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1')")
 
 # Remove elevation rw; linear in all covariates
-f_magna_models[['red_mod_linear_all_cov']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation")
+f_magna_models[['red_mod_linear_all_cov']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation")
 
 # Survival hypothesis -- precip, snow, wetland
-f_magna_models[['red_mod_survival']] = as.formula("fmagna_ff ~ Precipitation + Snow + Distance_to_wetland")
+f_magna_models[['red_mod_survival']] = as.formula("fmagna_ff ~ Precipitation + Snow + geomorphon")
 
 # No survival -- large-scale and small-scale spatial variation
 
@@ -246,3 +258,87 @@ null_model_ls = list(
 )
 
 save(null_model_ls, file = "model_outputs/logreg/fmagna/null_model.Rdata")
+
+# full_model -------------------------------
+
+# Set up stacks
+{
+  
+  
+  # ggplot() +
+  #   gg(data_sp) +
+  #   gg(adk_mesh) +
+  #   gg(adkbound) +
+  #   coord_fixed(ratio = 1)
+  
+  
+  stk <- inla.stack(
+    data = list(fmagna_ff = data$fmagna_ff),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = data$Elevation,
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        geomorphon = data$geomorphon
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(fmagna_ff = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Elevation = predict_grid_scaled@data$Elevation,
+        Northing = predict_grid_scaled@data$Northing,
+        Precipitation = predict_grid_scaled@data$Precipitation,
+        Snow = predict_grid_scaled@data$Snow,
+        geomorphon = predict_grid_scaled$geomorphon
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+full_model = inla(formula = f_magna_models$full_model,
+                  family = 'binomial',
+                  data = inla.stack.data(stk),
+                  control.compute = list(waic = TRUE,
+                                         cpo  = TRUE),
+                  control.predictor = list(A = inla.stack.A(stk))
+)
+
+full_model_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = full_model
+)
+
+save(full_model_ls, file = "model_outputs/logreg/full_model.Rdata")
+
+Cairo::Cairo(width = 1024*3, height = 768*3, file = 'images/logreg_full_cpo.png', dpi = 100*4)
+ggplot() + 
+  geom_point(aes(x = seq_along(full_model$cpo$cpo), y = full_model$cpo$cpo)) +
+  theme_bw() + xlab("Index") + ylab("Conditional Predictive Ordinate") + ggtitle("CPO values for the full model fit to binary data")
+dev.off()
+
+Cairo::Cairo(width = 1024*3, height = 768*3, file = 'images/logreg_full_pit.png', dpi = 100*4)
+ggplot() + 
+  geom_point(aes(x = (1:n) / (n+1), y = sort(full_model$cpo$pit))) +
+  geom_abline(slope = 1, intercept = 0) +
+  xlim(c(0,1)) + ylim(c(0,1)) + coord_equal() + 
+  theme_bw() + xlab("Theoretical quantiles") + ylab("PIT probabilities") + ggtitle("PIT values for the full model fit to binary data")
+dev.off()
+
