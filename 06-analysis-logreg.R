@@ -153,7 +153,7 @@ predict_grid@data$Snow = snowcover_means
 # use selection from before to parameterize
 
 geomorphon = raster::raster(paste0('../../GIS/geomorphon/', s_geomorph, '.tif'))
-predict_grid@data$geomorphon = raster::extract(geomorphon, predict_grid, method = 'simple', fun =)
+predict_grid@data$geomorphon = raster::extract(geomorphon, predict_grid, method = 'simple')
 
 # Scale prediction
 
