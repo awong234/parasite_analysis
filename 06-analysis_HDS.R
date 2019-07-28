@@ -135,6 +135,11 @@ wetland_dist = raster::raster('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.
 
 predict_grid@data$Distance_to_wetland = raster::extract(wetland_dist, predict_grid)
 
+# Add geomorphon 
+
+geomorphon = raster::raster(paste0('../../GIS/geomorphon/', s_geomorph, '.tif'))
+predict_grid@data$geomorphon = raster::extract(geomorphon, predict_grid, method = 'simple')
+
 # Scale prediction
 
 predict_grid_complete = predict_grid[complete.cases(predict_grid@data),]
@@ -168,21 +173,21 @@ f_magna_models = list()
 f_magna_models[['null_model']] = as.formula("fmagna_ff ~ 1")
 
 # Full model with spatial effect
-f_magna_models[['full_model']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation + f(i, model = spde)")
+f_magna_models[['full_model']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation + f(i, model = spde)")
 
 # Full model with elevation random walk
-f_magna_models[['full_model_elev_rw']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1') + f(i, model = spde)")
+f_magna_models[['full_model_elev_rw']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1') + f(i, model = spde)")
 
 # Reduced models
 
 # Remove spatial effect, all covariates and rw elevation
-f_magna_models[['red_mod_minus_speff']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1')")
+f_magna_models[['red_mod_minus_speff']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1')")
 
 # Remove elevation rw; linear in all covariates
-f_magna_models[['red_mod_linear_all_cov']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation")
+f_magna_models[['red_mod_linear_all_cov']] = as.formula("fmagna_ff ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation")
 
 # Survival hypothesis -- precip, snow, wetland
-f_magna_models[['red_mod_survival']] = as.formula("fmagna_ff ~ Precipitation + Snow + Distance_to_wetland")
+f_magna_models[['red_mod_survival']] = as.formula("fmagna_ff ~ Precipitation + Snow + geomorphon")
 
 # No survival -- large-scale and small-scale spatial variation
 
@@ -264,7 +269,7 @@ save(null_model_ls, file = "model_outputs/null_model.Rdata")
         Northing = data$Northing,
         Precipitation = data$Precipitation,
         Snow = data$Snow,
-        Distance_to_wetland = data$Distance_to_wetland
+        geomorphon = data$geomorphon
       )
     ),
     tag = 'dat'
@@ -282,7 +287,7 @@ save(null_model_ls, file = "model_outputs/null_model.Rdata")
         Northing = predict_grid_scaled@data$Northing,
         Precipitation = predict_grid_scaled@data$Precipitation,
         Snow = predict_grid_scaled@data$Snow,
-        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+        geomorphon = predict_grid_scaled$geomorphon
       )
     ),
     tag = 'pred'
@@ -325,7 +330,7 @@ save(full_model_ls, file = "model_outputs/full_model.Rdata")
         Northing = data$Northing,
         Precipitation = data$Precipitation,
         Snow = data$Snow,
-        Distance_to_wetland = data$Distance_to_wetland
+        geomorphon = data$geomorphon
       )
     ),
     tag = 'dat'
@@ -343,7 +348,7 @@ save(full_model_ls, file = "model_outputs/full_model.Rdata")
         Northing = predict_grid_scaled@data$Northing,
         Precipitation = predict_grid_scaled@data$Precipitation,
         Snow = predict_grid_scaled@data$Snow,
-        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+        geomorphon = predict_grid_scaled$geomorphon
       )
     ),
     tag = 'pred'
@@ -383,7 +388,7 @@ save(full_model_elev_rw_ls, file = "model_outputs/full_model_elev_rw_ls.Rdata")
         Northing = data$Northing,
         Precipitation = data$Precipitation,
         Snow = data$Snow,
-        Distance_to_wetland = data$Distance_to_wetland
+        geomorphon = data$geomorphon
       )
     ),
     tag = 'dat'
@@ -400,7 +405,7 @@ save(full_model_elev_rw_ls, file = "model_outputs/full_model_elev_rw_ls.Rdata")
         Northing = predict_grid_scaled@data$Northing,
         Precipitation = predict_grid_scaled@data$Precipitation,
         Snow = predict_grid_scaled@data$Snow,
-        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+        geomorphon = predict_grid_scaled$geomorphon
       )
     ),
     tag = 'pred'
@@ -579,21 +584,21 @@ p_tenuis_models = list()
 p_tenuis_models[['null_model']] = as.formula("dsl_mb ~ 1")
 
 # Full model with spatial effect
-p_tenuis_models[['full_model']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation + f(i, model = spde)")
+p_tenuis_models[['full_model']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation + f(i, model = spde)")
 
 # Full model with elevation random walk
-p_tenuis_models[['full_model_elev_rw']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1') + f(i, model = spde)")
+p_tenuis_models[['full_model_elev_rw']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1') + f(i, model = spde)")
 
 # Reduced models
 
 # Remove spatial effect, all covariates and rw elevation
-p_tenuis_models[['red_mod_minus_speff']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + f(Elevation, model = 'rw1')")
+p_tenuis_models[['red_mod_minus_speff']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1')")
 
 # Remove elevation rw; linear in all covariates
-p_tenuis_models[['red_mod_linear_all_cov']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + Distance_to_wetland + Elevation")
+p_tenuis_models[['red_mod_linear_all_cov']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation")
 
 # Survival hypothesis -- precip, snow, wetland
-p_tenuis_models[['red_mod_survival']] = as.formula("dsl_mb ~ Precipitation + Snow + Distance_to_wetland")
+p_tenuis_models[['red_mod_survival']] = as.formula("dsl_mb ~ Precipitation + Snow + geomorphon")
 
 # No survival -- large-scale and small-scale spatial variation
 
@@ -640,7 +645,7 @@ save(null_model_ls, file = "model_outputs/ptenuis/null_model.Rdata")
         Northing = data$Northing,
         Precipitation = data$Precipitation,
         Snow = data$Snow,
-        Distance_to_wetland = data$Distance_to_wetland
+        geomorphon = data$geomorphon
       )
     ),
     tag = 'dat'
@@ -658,7 +663,7 @@ save(null_model_ls, file = "model_outputs/ptenuis/null_model.Rdata")
         Northing = predict_grid_scaled@data$Northing,
         Precipitation = predict_grid_scaled@data$Precipitation,
         Snow = predict_grid_scaled@data$Snow,
-        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+        geomorphon = predict_grid_scaled$geomorphon
       )
     ),
     tag = 'pred'
@@ -700,7 +705,7 @@ save(full_model_ls, file = "model_outputs/ptenuis/full_model.Rdata")
         Northing = data$Northing,
         Precipitation = data$Precipitation,
         Snow = data$Snow,
-        Distance_to_wetland = data$Distance_to_wetland
+        geomorphon = data$geomorphon
       )
     ),
     tag = 'dat'
@@ -718,7 +723,7 @@ save(full_model_ls, file = "model_outputs/ptenuis/full_model.Rdata")
         Northing = predict_grid_scaled@data$Northing,
         Precipitation = predict_grid_scaled@data$Precipitation,
         Snow = predict_grid_scaled@data$Snow,
-        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+        geomorphon = predict_grid_scaled$geomorphon
       )
     ),
     tag = 'pred'
@@ -758,7 +763,7 @@ save(full_model_elev_rw_ls, file = "model_outputs/ptenuis/full_model_elev_rw_ls.
         Northing = data$Northing,
         Precipitation = data$Precipitation,
         Snow = data$Snow,
-        Distance_to_wetland = data$Distance_to_wetland
+        geomorphon = data$geomorphon
       )
     ),
     tag = 'dat'
@@ -775,7 +780,7 @@ save(full_model_elev_rw_ls, file = "model_outputs/ptenuis/full_model_elev_rw_ls.
         Northing = predict_grid_scaled@data$Northing,
         Precipitation = predict_grid_scaled@data$Precipitation,
         Snow = predict_grid_scaled@data$Snow,
-        Distance_to_wetland = predict_grid_scaled$Distance_to_wetland
+        geomorphon = predict_grid_scaled$geomorphon
       )
     ),
     tag = 'pred'
