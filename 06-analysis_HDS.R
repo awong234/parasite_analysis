@@ -44,6 +44,12 @@ data %<>% mutate(JulianDay = lubridate::yday(Date) %>% scale())
 
 data = data[complete.cases(data %>% select(fmagna_ff, dsl_mb, Easting:JulianDay)),]
 
+# Select geomorphon 
+s_geomorph = 'geomorphon_40'
+
+data$geomorphon = data[, s_geomorph]
+
+
 # Data points as sp
 
 data_sp = data
@@ -135,10 +141,18 @@ wetland_dist = raster::raster('../../GIS/NY_shapefile_wetlands/dist_to_wetlands.
 
 predict_grid@data$Distance_to_wetland = raster::extract(wetland_dist, predict_grid)
 
-# Add geomorphon 
 
+# Add geomorphon values
+# Select 40-cell scale
+
+s_geomorph = 'geomorphon_40'
 geomorphon = raster::raster(paste0('../../GIS/geomorphon/', s_geomorph, '.tif'))
-predict_grid@data$geomorphon = raster::extract(geomorphon, predict_grid, method = 'simple')
+temp = raster::extract(geomorphon, predict_grid, method = 'simple')
+temp = factor(temp, levels = as.integer(seq(1,10)), labels = c('flat', 'summit', 'ridge', 'shoulder', 
+                                                               'spur', 'slope', 'hollow', 'footslope',
+                                                               'valley', 'depression'))
+
+predict_grid@data$geomorphon = temp
 
 # Scale prediction
 
@@ -242,7 +256,7 @@ null_model_ls = list(
   "model"      = null_model
 )
 
-save(null_model_ls, file = "model_outputs/null_model.Rdata")
+save(null_model_ls, file = "model_outputs/fmagna/null_model.Rdata")
 
 # Full model with spatial effect -------------------------------
 
@@ -311,7 +325,7 @@ full_model_ls = list(
   "model" = full_model
 )
 
-save(full_model_ls, file = "model_outputs/full_model.Rdata")
+save(full_model_ls, file = "model_outputs/fmagna/full_model.Rdata")
 
 # Full model with elevation random walk -----------------------------------------------
 
