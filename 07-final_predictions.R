@@ -26,7 +26,7 @@ waic_df
 
 # Summaries f magna -------------------------------------
 
-m_out = list.files('model_outputs/fmagna/', full.names = T)
+m_out = list.files('model_outputs/fmagna/', full.names = T, pattern = 'Rdata')
 
 for(m in m_out){
   load(m)
