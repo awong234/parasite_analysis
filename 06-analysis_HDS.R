@@ -385,7 +385,7 @@ full_model_elev_rw_ls = list(
   "model"      = full_model_elev_rw
 )
 
-save(full_model_elev_rw_ls, file = "model_outputs/full_model_elev_rw_ls.Rdata")
+save(full_model_elev_rw_ls, file = "model_outputs/fmagna/full_model_elev_rw_ls.Rdata")
 
 # Reduced: Remove spatial effect, all covariates and rw elevation --------------
 
@@ -443,7 +443,7 @@ red_mod_minus_speff_ls = list(
   "model"      = red_mod_minus_speff
 )
 
-save(red_mod_minus_speff_ls, file = "model_outputs/red_mod_minus_speff_ls.Rdata")
+save(red_mod_minus_speff_ls, file = "model_outputs/fmagna/red_mod_minus_speff_ls.Rdata")
 
 
 # Reduced: Remove elevation rw; linear in all covariates ------------------
@@ -462,7 +462,7 @@ red_mod_linear_all_cov_ls = list(
   "model"      = red_mod_linear_all_cov
 )
 
-save(red_mod_linear_all_cov_ls, file = 'model_outputs/red_mod_linear_all_cov_ls.Rdata')
+save(red_mod_linear_all_cov_ls, file = 'model_outputs/fmagna/red_mod_linear_all_cov_ls.Rdata')
 
 
 # Reduced: Survival hypothesis -- precip, snow, wetland -------------------
@@ -479,7 +479,7 @@ red_mod_survival_ls = list(
   "model"      = red_mod_survival
 )
 
-save(red_mod_survival_ls, file = 'model_outputs/red_mod_survival_ls.Rdata')
+save(red_mod_survival_ls, file = 'model_outputs/fmagna/red_mod_survival_ls.Rdata')
 
 
 # Reduced: no survival -- large-scale and small-scale spatial vari --------
@@ -532,7 +532,7 @@ red_mod_spatial_ls = list(
   "model" = red_mod_spatial
 )
 
-save(red_mod_spatial_ls, file = "model_outputs/red_mod_spatial.Rdata")
+save(red_mod_spatial_ls, file = "model_outputs/fmagna/red_mod_spatial.Rdata")
 
 
 # Reduced: No survival -- with linear elevation also ----------------------
@@ -574,7 +574,7 @@ save(red_mod_spatial_ls, file = "model_outputs/red_mod_spatial.Rdata")
 
 }
 
-red_mod_spatial_elev_elev = inla(formula = f_magna_models$red_mod_spatial_elev_elev,
+red_mod_spatial_elev = inla(formula = f_magna_models$red_mod_spatial_elev,
                        family = 'nbinomial',
                        data = inla.stack.data(stk),
                        control.compute = list(waic = TRUE, cpo  = TRUE),
@@ -587,7 +587,7 @@ red_mod_spatial_elev_ls = list(
   "model" = red_mod_spatial_elev
 )
 
-save(red_mod_spatial_elev_ls, file = "model_outputs/red_mod_spatial_elev.Rdata")
+save(red_mod_spatial_elev_ls, file = "model_outputs/fmagna/red_mod_spatial_elev.Rdata")
 
 # P tenuis models -----------------------------------------------
 
