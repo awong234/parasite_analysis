@@ -231,6 +231,8 @@ adk_mesh = inla.mesh.2d(boundary=boundary,
                         cutoff=1050, ## Filter away adjacent points.
                         offset=c(5200, 15000)) ## Offset for extra boundaries, if needed.
 
+save(adk_mesh, file = 'model_outputs/adk_mesh.Rdata')
+
 projector_A = inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
 predictor_A = inla.spde.make.A(adk_mesh, loc = predict_grid_scaled@coords)
 
