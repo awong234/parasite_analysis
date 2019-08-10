@@ -68,6 +68,16 @@ ggplot(cpo_vals_fmagna) +
 
 rm(list = mod_list %>% names) ; gc()  
 
+# Compare against fmagna values
+
+combos = cpo_vals_fmagna %>% select(model, variable) %>% unique %>% nrow
+
+cpo_vals_fmagna %>% mutate(response = rep(data$fmagna_ff, times = combos)) %>% 
+  ggplot() + 
+  geom_point(aes(x = response, y = value), shape = 1, alpha = 0.5) + 
+  facet_grid(model ~ variable) + 
+  theme_bw()
+
 # Summaries p tenuis models' waic -------------------------------------------------
 
 m_out = list.files('model_outputs/ptenuis/', full.names = T, pattern = 'Rdata')
