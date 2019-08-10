@@ -4,6 +4,7 @@ source('functions.R')
 library(ggplot2)
 library(dplyr)
 
+load('data_no_na.Rdata')
 
 # Summaries to refresh waic -----------
 
@@ -37,6 +38,7 @@ mod_list = list(
   'full_model_ls'             = full_model_ls,
   'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
   'red_mod_spatial_ls'        = red_mod_spatial_ls,
+  'red_mod_spatial_elev_ls'   = red_mod_spatial_elev_ls,
   # 'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
   'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
   'red_mod_survival_ls'       = red_mod_survival_ls
