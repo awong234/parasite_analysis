@@ -1,5 +1,21 @@
 # Analysis util functions ----------
 
+# Aids in extracting cpo from models
+
+models_cpo = function(model_names, model_list){
+  cpo_out = matrix(data = NA, nrow = nrow(data), ncol = nrow(model_list))
+  names(cpo_out) = model_names
+  for( name in model_names ) {
+    mod_to_load = models_list[grep(models_list, pattern = paste0("\\/",name, "\\."), ignore.case = T)]
+    if(length(mod_to_load) == 0){next}
+    mod = readRDS(mod_to_load)
+    mod_cpo = mod$cpo$cpo
+    cpo_out[[name]] = mod_cpo
+  }
+  
+  return(cpo_out)
+}
+
 # Aids in extracting waic from models located on disk.
 
 hds_model_waic = function(hds_models_name, models_list) {
@@ -26,6 +42,23 @@ aicFunc = function(model_ls){
   return(waic)
   
 }
+
+# aids in extracting cpo from loaded models
+
+cpoFunc = function(model_ls, name){
+  
+  item = model_ls[[3]]
+  
+  out1 = item$cpo$cpo
+  out2 = item$cpo$pit
+  
+  out = data.frame("cpo" = out1, "pit" = out2, "model" = name)
+  
+  return(out)
+  
+}
+
+
 
 
 # Analysis functions ------------
