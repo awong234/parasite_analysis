@@ -153,7 +153,12 @@ predict_grid@data$Snow = snowcover_means
 # use selection from before to parameterize
 
 geomorphon = raster::raster(paste0('../../GIS/geomorphon/', s_geomorph, '.tif'))
-predict_grid@data$geomorphon = raster::extract(geomorphon, predict_grid, method = 'simple')
+temp = raster::extract(geomorphon, predict_grid, method = 'simple')
+temp = factor(temp, levels = as.integer(seq(1,10)), labels = c('flat', 'summit', 'ridge', 'shoulder', 
+                                                               'spur', 'slope', 'hollow', 'footslope',
+                                                               'valley', 'depression'))
+
+predict_grid@data$geomorphon = temp
 
 # Scale prediction
 
