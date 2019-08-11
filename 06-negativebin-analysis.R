@@ -949,7 +949,7 @@ save(red_mod_spatial_ls, file = "model_outputs/ptenuis/red_mod_spatial.Rdata")
 
 }
 
-red_mod_spatial_elev_elev = inla(formula = p_tenuis_models$red_mod_spatial_elev,
+red_mod_spatial_elev = inla(formula = p_tenuis_models$red_mod_spatial_elev,
                                  family = 'nbinomial',
                                  data = inla.stack.data(stk),
                                  control.compute = list(waic = TRUE, cpo  = TRUE),
