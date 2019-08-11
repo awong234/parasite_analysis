@@ -1,5 +1,46 @@
 # Analysis util functions ----------
 
+effects_extr = function(model_list, model_names, var_order) {
+  
+  if(var_order[1] != "(Intercept)") var_order = c("(Intercept)", var_order)
+  
+  fixed_eff = Map(f = function(x, nam){
+    # browser()
+    out = x$model$summary.fixed
+    out$name = nam
+    out$variable = rownames(out) %>% gsub(pattern = "geomorphon", replacement = "")
+    out$variable = factor(out$variable, levels = rev(var_order) %>% gsub(pattern = "geomorphon", replacement = ""))
+    rownames(out) = NULL
+    return(out)
+    },
+    x = model_list,
+    nam = model_names
+    )
+  # browser()
+  fixed_eff = do.call(what = rbind, args = fixed_eff)
+  rownames(fixed_eff) = NULL
+  
+  ranef = Map(f = function(x, nam){
+    out = x$model$summary.hyperpar
+    out$name = nam
+    out$variable = rownames(out)
+    rownames(out) = NULL
+    return(out)
+    },
+    x = model_list,
+    nam = model_names
+    )
+  
+  ranef = do.call(what = rbind, args = ranef)
+  rownames(ranef) = NULL
+  
+  out = list("Fixed" = fixed_eff,
+             "Hyperpars" = ranef)
+  
+  return(out)
+  
+}
+
 # Aids in extracting cpo from models
 
 models_cpo = function(model_names, model_list){
@@ -170,3 +211,65 @@ getSnowFromDate = function(dates, snow_data, snow_dates){
   
 }
 
+# Utility -------------------------------
+
+ggmeshcust = function (data, color = NULL, alpha = NULL, edge.color = "grey", 
+                       interior = TRUE, exterior = TRUE, ext.color = "black", 
+                       crs = NULL, mask = NULL, nx = 500, ny = 500, ...) 
+{
+  if (!is.null(color)) {
+    px = pixels(data, nx = nx, ny = ny)
+    A = INLA::inla.spde.make.A(data, px)
+    px$color = as.vector(A %*% color)
+    if (!is.null(alpha)) {
+      px$alpha = as.vector(A %*% alpha)
+      gg = gg(px, mask = mask, alpha = "alpha")
+    }
+    else {
+      gg = gg(px, mask = mask)
+    }
+    return(gg)
+  }
+  else {
+    if (data$manifold == "S2") {
+      stop("Geom not implemented for spherical meshes (manifold = S2)")
+    }
+    if (!is.null(crs)) {
+      data = INLA::inla.spTransform(data, CRSobj = crs)
+    }
+    df = rbind(data.frame(a = data$loc[data$graph$tv[, 1], 
+                                       c(1, 2)], b = data$loc[data$graph$tv[, 2], c(1, 
+                                                                                    2)]), data.frame(a = data$loc[data$graph$tv[, 2], 
+                                                                                                                  c(1, 2)], b = data$loc[data$graph$tv[, 3], c(1, 
+                                                                                                                                                               2)]), data.frame(a = data$loc[data$graph$tv[, 1], 
+                                                                                                                                                                                             c(1, 2)], b = data$loc[data$graph$tv[, 3], c(1, 
+                                                                                                                                                                                                                                          2)]))
+    colnames(df) = c("x", "y", "xend", "yend")
+    mp = aes_string(x = "x", y = "y", xend = "xend", yend = "yend")
+    msh = geom_segment(data = df, mapping = mp, color = edge.color)
+    if (exterior) {
+      df = data.frame(data$loc[data$segm$bnd$idx[, 1], 
+                               1:2], data$loc[data$segm$bnd$idx[, 2], 1:2])
+      colnames(df) = c("x", "y", "xend", "yend")
+      bnd = geom_segment(data = df, mapping = mp, color = ext.color)
+    }
+    else {
+      bnd = NULL
+    }
+    if (interior) {
+      df = data.frame(data$loc[data$segm$int$idx[, 1], 
+                               1:2], data$loc[data$segm$int$idx[, 2], 1:2])
+      colnames(df) = c("x", "y", "xend", "yend")
+      if (nrow(df) == 0) {
+        int = NULL
+      }
+      else {
+        int = geom_segment(data = df, mapping = aes_string(x = "x", y = "y", xend = "xend", yend = "yend", color = '"interior"'))
+      }
+    }
+    else {
+      int = NULL
+    }
+    c(msh, bnd, int)
+  }
+}
