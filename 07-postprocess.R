@@ -2,28 +2,43 @@
 source('functions.R')
 
 library(ggplot2)
-library(dplyr)
+library(dplyr) ; `%<>%` = magrittr::`%<>%`
+
+
 
 load('data_no_na.Rdata')
 
+model_matches = data.frame(fitnames = c("null_model", 
+                                        "full_model", 
+                                        "red_mod_linear_all_cov", 
+                                        "red_mod_survival",
+                                        "red_mod_spatial", 
+                                        "red_mod_spatial_elev"),
+                           pubnames = c("Null Model", 
+                                        "Full model", 
+                                        "Fixed effects model", 
+                                        "Fixed Effects Parasite Survival Model", 
+                                        "Two-scale spatial model", 
+                                        "Two-scale spatial model and elevation"),
+                           stringsAsFactors = F)
+
 # Summaries to refresh waic -----------
 
-hds_models = readr::read_csv('hds_models.csv')
-
-models_list = list.files(path = 'model_outputs/hds/', full.names = T)
-
-hds_models_name = hds_models$Name
-
-waic_ls = hds_model_waic(hds_models_name = hds_models_name, models_list = models_list)
-
-waic_vec = do.call(what = c, args = waic_ls)
-
-waic_df = data.frame(model = names(waic_vec), waic = waic_vec, row.names = NULL) %>% arrange(waic)
-
-waic_df
+# hds_models = readr::read_csv('hds_models.csv')
+# 
+# models_list = list.files(path = 'model_outputs/hds/', full.names = T)
+# 
+# hds_models_name = hds_models$Name
+# 
+# waic_ls = hds_model_waic(hds_models_name = hds_models_name, models_list = models_list)
+# 
+# waic_vec = do.call(what = c, args = waic_ls)
+# 
+# waic_df = data.frame(model = names(waic_vec), waic = waic_vec, row.names = NULL) %>% arrange(waic)
+# 
+# waic_df
 
 # Obtain parasite distribution models ----------------------------------
-
 
 # Summaries f magna -------------------------------------
 
