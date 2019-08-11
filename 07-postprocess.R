@@ -22,24 +22,6 @@ model_matches = data.frame(fitnames = c("null_model",
                                         "Two-scale spatial model and elevation"),
                            stringsAsFactors = F)
 
-# Summaries to refresh waic -----------
-
-# hds_models = readr::read_csv('hds_models.csv')
-# 
-# models_list = list.files(path = 'model_outputs/hds/', full.names = T)
-# 
-# hds_models_name = hds_models$Name
-# 
-# waic_ls = hds_model_waic(hds_models_name = hds_models_name, models_list = models_list)
-# 
-# waic_vec = do.call(what = c, args = waic_ls)
-# 
-# waic_df = data.frame(model = names(waic_vec), waic = waic_vec, row.names = NULL) %>% arrange(waic)
-# 
-# waic_df
-
-# Obtain parasite distribution models ----------------------------------
-
 # Summaries f magna -------------------------------------
 
 m_out = list.files('model_outputs/fmagna/', full.names = T, pattern = 'Rdata')
