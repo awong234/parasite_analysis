@@ -58,19 +58,22 @@ fmagna_effects = effects_extr(mod_list, model_names = names(mod_list), var_order
 
 fmagna_effects$Fixed %<>% left_join(model_matches, by = c("name" = "fitnames"))
 
-Cairo::Cairo(width = 1100, height = 1600, file = 'images/parplot_fmagna.pdf', dpi = 110, type = 'pdf')
+save(fmagna_effects, file = 'model_outputs/fmagna_effects.Rdata')
+
+Cairo::Cairo(width = 650, height = 1600, file = 'images/parplot_fmagna.pdf', dpi = 110, type = 'pdf')
 ggplot(fmagna_effects$Fixed) + 
   geom_hline(yintercept = 0) + 
   geom_point(aes(x = variable, y = mode, color = pubnames, shape = pubnames), position = position_dodge(0.3)) + 
   geom_errorbar(aes(x = variable, ymin = `0.025quant`, ymax = `0.975quant`, color = pubnames, linetype = pubnames), width = 0, position = position_dodge(0.3)) + 
   # facet_wrap(facets = ~name, nrow = length(names(mod_list))) + 
   scale_color_viridis_d(option = 'D') + 
-  guides(linetype = guide_legend(title = "Model"), shape = guide_legend(title = "Model"),  color = guide_legend(title = "Model")) +
+  # guides(linetype = guide_legend(title = "Model"), shape = guide_legend(title = "Model"),  color = guide_legend(title = "Model")) +
   # coord_cartesian(ylim = c(-5, 5)) + 
   coord_flip(ylim = c(-5, 5)) +
   theme_bw() + theme(
     panel.grid.major.y = element_blank(),
-    panel.grid.minor.y = element_blank()
+    panel.grid.minor.y = element_blank(),
+    legend.position = 'none'
   )
 dev.off()
 
@@ -98,13 +101,15 @@ dev.off()
 
 # Compare against fmagna values
 
-combos = cpo_vals_fmagna %>% select(model, variable) %>% unique %>% nrow
+combos = cpo_vals_fmagna %>% select(pubnames, variable) %>% unique %>% nrow
 
+Cairo::Cairo(width = 1024, height = 768*2, file = "images/cpo_by_response_fmagna.pdf", type = "pdf", dpi = 80)
 cpo_vals_fmagna %>% mutate(response = rep(data$fmagna_ff, times = combos)) %>% 
   ggplot() + 
   geom_point(aes(x = response, y = value), shape = 1, alpha = 0.5) + 
-  facet_grid(model ~ variable) + 
+  facet_grid(pubnames ~ variable) + 
   theme_bw()
+dev.off()
 
 rm(list = ls(pattern = '_ls'))
 
@@ -140,6 +145,8 @@ save(aic_vals_ptenuis, file = 'model_outputs/aicvals_ptenuis.Rdata')
 ptenuis_effects = effects_extr(mod_list, model_names = names(mod_list), var_order = varorder)
 
 ptenuis_effects$Fixed %<>% left_join(model_matches, by = c("name" = "fitnames"))
+
+save(ptenuis_effects, file = 'model_outputs/ptenuis_effects.Rdata')
 
 Cairo::Cairo(width = 1100, height = 1600, file = 'images/parplot_ptenuis.pdf', dpi = 110, type = 'pdf')
 ggplot(ptenuis_effects$Fixed) + 
@@ -180,10 +187,12 @@ dev.off()
 
 # Compare against ptenuis values
 
-combos = cpo_vals_ptenuis %>% select(model, variable) %>% unique %>% nrow
+combos = cpo_vals_ptenuis %>% select(pubnames, variable) %>% unique %>% nrow
 
+Cairo::Cairo(width = 1024, height = 768*2, file = "images/cpo_by_response_ptenuis.pdf", type = "pdf", dpi = 80)
 cpo_vals_ptenuis %>% mutate(response = rep(data$dsl_mb, times = combos)) %>% 
   ggplot() + 
   geom_point(aes(x = response, y = value), shape = 1, alpha = 0.5) + 
-  facet_grid(model ~ variable) + 
+  facet_grid(pubnames ~ variable) + 
   theme_bw()
+dev.off()
