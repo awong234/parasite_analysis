@@ -3,6 +3,7 @@ source('functions.R')
 
 library(ggplot2)
 library(dplyr) ; `%<>%` = magrittr::`%<>%`
+library(reshape2)
 
 
 
@@ -76,7 +77,7 @@ cpo_vals_fmagna = Map(f = function(mod, nam) {
 cpo_vals_fmagna = do.call(what = rbind, args = cpo_vals_fmagna)
 rownames(cpo_vals_fmagna) = NULL
 
-cpo_vals_fmagna = reshape2::melt(cpo_vals_fmagna, id.vars = "model")
+cpo_vals_fmagna = reshape2::melt(cpo_vals_fmagna, id.vars = "pubnames", measure.vars = c("cpo", "pit"))
 
 ggplot(cpo_vals_fmagna) + 
   geom_density(aes(x = value, fill = model), alpha = 0.3) + 
@@ -149,7 +150,7 @@ cpo_vals_ptenuis = Map(f = function(mod, nam) {
 cpo_vals_ptenuis = do.call(what = rbind, args = cpo_vals_ptenuis)
 rownames(cpo_vals_ptenuis) = NULL
 
-rm(list = mod_list %>% names) ; gc()
+cpo_vals_ptenuis = melt(cpo_vals_ptenuis, id.vars = "pubnames", measure.vars = c("cpo", "pit"))
 
 cpo_vals_ptenuis = reshape2::melt(cpo_vals_ptenuis, id.vars = "model")
 
