@@ -49,21 +49,38 @@ for(m in m_out){
 }
 
 mod_list = list(
-  'null_model_ls'             = null_model_ls,
-  'full_model_ls'             = full_model_ls,
-  'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
-  'red_mod_spatial_ls'        = red_mod_spatial_ls,
-  'red_mod_spatial_elev_ls'   = red_mod_spatial_elev_ls,
-  # 'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
-  'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
-  'red_mod_survival_ls'       = red_mod_survival_ls
+  'null_model'             = null_model_ls,
+  'full_model'             = full_model_ls,
+  # 'full_model_elev_rw'     = full_model_elev_rw_ls,
+  'red_mod_spatial'        = red_mod_spatial_ls,
+  'red_mod_spatial_elev'   = red_mod_spatial_elev_ls,
+  # 'red_mod_minus_speff'    = red_mod_minus_speff_ls,
+  'red_mod_linear_all_cov' = red_mod_linear_all_cov_ls,
+  'red_mod_survival'       = red_mod_survival_ls
 )
 
 # WAIC
 
 aic_vals_fmagna = sapply(mod_list, aicFunc)
 
-aic_vals_fmagna = data.frame("model" = names(mod_list), "waic" = aic_vals_fmagna) %>% arrange(waic)
+aic_vals_fmagna = data.frame("model" = names(mod_list), "waic" = aic_vals_fmagna, stringsAsFactors = F) %>% arrange(waic)
+
+save(aic_vals_fmagna, file = 'model_outputs/aicvals_fmagna.Rdata')
+
+# Plot fixed effects -----------------------------------
+
+fmagna_effects = effects_extr(mod_list, model_names = names(mod_list), var_order = rownames(full_model_ls$model$summary.fixed))
+
+fmagna_effects$Fixed %<>% left_join(model_matches, by = c("name" = "fitnames"))
+
+ggplot(fmagna_effects$Fixed) + 
+  geom_point(aes(x = variable, y = mode, color = pubnames, shape = pubnames), position = position_dodge(0.3)) + 
+  geom_errorbar(aes(x = variable, ymin = `0.025quant`, ymax = `0.975quant`, color = pubnames, linetype = pubnames), width = 0, position = position_dodge(0.3)) + 
+  # facet_wrap(facets = ~name, nrow = length(names(mod_list))) + 
+  scale_color_viridis_d(option = 'D') + 
+  ylim(c(-3, 3)) +
+  coord_flip() + 
+  theme_bw()
 
 # Get all the cpo and pit values for charts ------------
 
@@ -80,10 +97,8 @@ cpo_vals_fmagna = reshape2::melt(cpo_vals_fmagna, id.vars = "model")
 ggplot(cpo_vals_fmagna) + 
   geom_density(aes(x = value, fill = model), alpha = 0.3) + 
   facet_wrap(~variable) + 
-  scale_fill_viridis_d(direction = -1) + 
+  scale_fill_manual(values = colorspace::terrain_hcl(n = 7)) + 
   theme_bw()
-
-rm(list = mod_list %>% names) ; gc()  
 
 # Compare against fmagna values
 
@@ -94,6 +109,8 @@ cpo_vals_fmagna %>% mutate(response = rep(data$fmagna_ff, times = combos)) %>%
   geom_point(aes(x = response, y = value), shape = 1, alpha = 0.5) + 
   facet_grid(model ~ variable) + 
   theme_bw()
+
+rm(list = mod_list %>% names) ; gc()  
 
 # Summaries p tenuis models' waic -------------------------------------------------
 
