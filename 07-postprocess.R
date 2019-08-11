@@ -78,8 +78,9 @@ ggplot(fmagna_effects$Fixed) +
   geom_errorbar(aes(x = variable, ymin = `0.025quant`, ymax = `0.975quant`, color = pubnames, linetype = pubnames), width = 0, position = position_dodge(0.3)) + 
   # facet_wrap(facets = ~name, nrow = length(names(mod_list))) + 
   scale_color_viridis_d(option = 'D') + 
-  ylim(c(-3, 3)) +
-  coord_flip() + 
+  guides(linetype = guide_legend(title = "Model"), shape = guide_legend(title = "Model"),  color = guide_legend(title = "Model")) +
+  # coord_cartesian(ylim = c(-5, 5)) + 
+  coord_flip(ylim = c(-5, 5)) +
   theme_bw()
 
 # Get all the cpo and pit values for charts ------------
@@ -121,13 +122,13 @@ for(m in m_out){
 }
 
 mod_list = list(
-  'null_model_ls'             = null_model_ls,
-  'full_model_ls'             = full_model_ls,
-  # 'full_model_elev_rw_ls'     = full_model_elev_rw_ls,
-  'red_mod_spatial_ls'        = red_mod_spatial_ls,
-  'red_mod_minus_speff_ls'    = red_mod_minus_speff_ls,
-  'red_mod_linear_all_cov_ls' = red_mod_linear_all_cov_ls,
-  'red_mod_survival_ls'       = red_mod_survival_ls
+  'null_model'             = null_model_ls,
+  'full_model'             = full_model_ls,
+  # 'full_model_elev_rw'     = full_model_elev_rw_ls,
+  'red_mod_spatial'        = red_mod_spatial_ls,
+  # 'red_mod_minus_speff'    = red_mod_minus_speff_ls,
+  'red_mod_linear_all_cov' = red_mod_linear_all_cov_ls,
+  'red_mod_survival'       = red_mod_survival_ls
 )
 
 # WAIC
@@ -135,6 +136,24 @@ mod_list = list(
 aic_vals_ptenuis = sapply(mod_list, aicFunc)
 
 aic_vals_ptenuis = data.frame("model" = names(mod_list), "waic" = aic_vals_ptenuis) %>% arrange(waic)
+
+save(aic_vals_ptenuis, file = 'model_outputs/aicvals_ptenuis.Rdata')
+
+# Plot fixed effects -----------------------------------
+
+ptenuis_effects = effects_extr(mod_list, model_names = names(mod_list), var_order = rownames(full_model_ls$model$summary.fixed))
+
+ptenuis_effects$Fixed %<>% left_join(model_matches, by = c("name" = "fitnames"))
+
+ggplot(ptenuis_effects$Fixed) + 
+  geom_point(aes(x = variable, y = mode, color = pubnames, shape = pubnames), position = position_dodge(0.3)) + 
+  geom_errorbar(aes(x = variable, ymin = `0.025quant`, ymax = `0.975quant`, color = pubnames, linetype = pubnames), width = 0, position = position_dodge(0.3)) + 
+  # facet_wrap(facets = ~name, nrow = length(names(mod_list))) + 
+  scale_color_viridis_d(option = 'D') + 
+  guides(linetype = guide_legend(title = "Model"), shape = guide_legend(title = "Model"),  color = guide_legend(title = "Model")) +
+  # coord_cartesian(ylim = c(-5, 5)) + 
+  coord_flip(ylim = c(-5, 5)) +
+  theme_bw()
 
 # Get all the cpo and pit values for charts ------------
 
