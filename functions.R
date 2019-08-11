@@ -93,7 +93,7 @@ cpoFunc = function(model_ls, name){
   out1 = item$cpo$cpo
   out2 = item$cpo$pit
   
-  out = data.frame("cpo" = out1, "pit" = out2, "model" = name)
+  out = data.frame("cpo" = out1, "pit" = out2, "model" = name, stringsAsFactors = F)
   
   return(out)
   
