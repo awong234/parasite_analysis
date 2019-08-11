@@ -241,9 +241,9 @@ spde <- inla.spde2.pcmatern(
   mesh = adk_mesh,
   alpha = 2,
   ### mesh and smoothness parameter
-  prior.range = c(1000, 0.01),
+  prior.range = c(100, 0.01),
   ### P(practic.range<0.3)=0.5
-  prior.sigma = c(1, 0.01)
+  prior.sigma = c(35, 0.01)
   ### P(sigma>1)=0.01
 )
 
