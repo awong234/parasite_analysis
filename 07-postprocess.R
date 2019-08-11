@@ -56,6 +56,7 @@ fmagna_effects = effects_extr(mod_list, model_names = names(mod_list), var_order
 fmagna_effects$Fixed %<>% left_join(model_matches, by = c("name" = "fitnames"))
 
 ggplot(fmagna_effects$Fixed) + 
+  geom_hline(yintercept = 0) + 
   geom_point(aes(x = variable, y = mode, color = pubnames, shape = pubnames), position = position_dodge(0.3)) + 
   geom_errorbar(aes(x = variable, ymin = `0.025quant`, ymax = `0.975quant`, color = pubnames, linetype = pubnames), width = 0, position = position_dodge(0.3)) + 
   # facet_wrap(facets = ~name, nrow = length(names(mod_list))) + 
@@ -93,7 +94,7 @@ cpo_vals_fmagna %>% mutate(response = rep(data$fmagna_ff, times = combos)) %>%
   facet_grid(model ~ variable) + 
   theme_bw()
 
-rm(list = mod_list %>% names) ; gc()  
+rm(list = ls(pattern = '_ls'))
 
 # Summaries p tenuis models' waic -------------------------------------------------
 
@@ -128,6 +129,7 @@ ptenuis_effects = effects_extr(mod_list, model_names = names(mod_list), var_orde
 ptenuis_effects$Fixed %<>% left_join(model_matches, by = c("name" = "fitnames"))
 
 ggplot(ptenuis_effects$Fixed) + 
+  geom_hline(yintercept = 0) + 
   geom_point(aes(x = variable, y = mode, color = pubnames, shape = pubnames), position = position_dodge(0.3)) + 
   geom_errorbar(aes(x = variable, ymin = `0.025quant`, ymax = `0.975quant`, color = pubnames, linetype = pubnames), width = 0, position = position_dodge(0.3)) + 
   # facet_wrap(facets = ~name, nrow = length(names(mod_list))) + 
