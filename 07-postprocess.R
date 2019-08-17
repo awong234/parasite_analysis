@@ -89,25 +89,26 @@ cpo_vals_fmagna = do.call(what = rbind, args = cpo_vals_fmagna) %>% left_join(mo
 
 rownames(cpo_vals_fmagna) = NULL
 
-cpo_vals_fmagna = reshape2::melt(cpo_vals_fmagna, id.vars = "pubnames", measure.vars = c("cpo", "pit"))
+cpo_vals_fmagna = reshape2::melt(cpo_vals_fmagna, id.vars = "pubnames", measure.vars = c("CPO", "PIT"))
 
-Cairo::Cairo(width = 1024*2, height = 768*2, file = "images/cpo_fmagna.pdf", type = "pdf", dpi = 120)
+Cairo::Cairo(width = 1024*2, height = 768*2, file = "images/cpo_fmagna.pdf", type = "pdf", dpi = 170)
 ggplot(cpo_vals_fmagna) + 
   geom_density(aes(x = value, fill = pubnames), alpha = 0.3) + 
   facet_wrap(~variable) + 
-  scale_fill_viridis_d(direction = -1) + 
-  theme_bw()
+  scale_fill_viridis_d(direction = -1, name = "Model Name") + 
+  theme_bw() + theme(legend.position = 'none', panel.grid = element_blank())
 dev.off()
+
 
 # Compare against fmagna values
 
 combos = cpo_vals_fmagna %>% select(pubnames, variable) %>% unique %>% nrow
 
-Cairo::Cairo(width = 1024, height = 768*2, file = "images/cpo_by_response_fmagna.pdf", type = "pdf", dpi = 80)
+Cairo::Cairo(width = 1024*2, height = 768, file = "images/cpo_by_response_fmagna.pdf", type = "pdf", dpi = 100, pointsize = 12)
 cpo_vals_fmagna %>% mutate(response = rep(data$fmagna_ff, times = combos)) %>% 
   ggplot() + 
   geom_point(aes(x = response, y = value), shape = 1, alpha = 0.5) + 
-  facet_grid(pubnames ~ variable) + 
+  facet_grid(variable ~ pubnames) + 
   theme_bw()
 dev.off()
 
@@ -175,24 +176,24 @@ cpo_vals_ptenuis = Map(f = function(mod, nam) {
 cpo_vals_ptenuis = do.call(what = rbind, args = cpo_vals_ptenuis) %>% left_join(model_matches, by = c("model" = "fitnames"))
 rownames(cpo_vals_ptenuis) = NULL
 
-cpo_vals_ptenuis = melt(cpo_vals_ptenuis, id.vars = "pubnames", measure.vars = c("cpo", "pit"))
+cpo_vals_ptenuis = melt(cpo_vals_ptenuis, id.vars = "pubnames", measure.vars = c("CPO", "PIT"))
 
-Cairo::Cairo(width = 1024*2, height = 768*2, file = "images/cpo_ptenuis.pdf", type = "pdf", dpi = 120)
+Cairo::Cairo(width = 1024*3, height = 768*2, file = "images/cpo_ptenuis.pdf", type = "pdf", dpi = 170)
 ggplot(cpo_vals_ptenuis) + 
   geom_density(aes(x = value, fill = pubnames), alpha = 0.3) + 
   facet_wrap(~variable) + 
-  scale_fill_viridis_d(direction = -1) + 
-  theme_bw()
+  scale_fill_viridis_d(direction = -1, name = "Model Name") + 
+  theme_bw() + theme(legend.position = 'right', panel.grid = element_blank())
 dev.off()
 
 # Compare against ptenuis values
 
 combos = cpo_vals_ptenuis %>% select(pubnames, variable) %>% unique %>% nrow
 
-Cairo::Cairo(width = 1024, height = 768*2, file = "images/cpo_by_response_ptenuis.pdf", type = "pdf", dpi = 80)
+Cairo::Cairo(width = 1024*2, height = 768, file = "images/cpo_by_response_ptenuis.pdf", type = "pdf", dpi = 100, pointsize = 12)
 cpo_vals_ptenuis %>% mutate(response = rep(data$dsl_mb, times = combos)) %>% 
   ggplot() + 
   geom_point(aes(x = response, y = value), shape = 1, alpha = 0.5) + 
-  facet_grid(pubnames ~ variable) + 
+  facet_grid(variable ~ pubnames) + 
   theme_bw()
 dev.off()
