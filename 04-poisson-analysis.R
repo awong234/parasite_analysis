@@ -79,9 +79,9 @@ data %>% select(fmagna_ff, dsl_mb) %>% plot
 
 # F magna
 
-full_model_poisson_fmagna = glm(formula = fmagna_ff ~ Easting + Northing + Year + Precipitation + I(Precipitation^2) + Snow + I(Snow^2) + Distance_to_wetland + Elevation+ I(Elevation^2) + JulianDay + I(JulianDay^2), family = "poisson", data = data, na.action = 'na.fail')
+full_model_poisson_fmagna = glm(formula = fmagna_ff ~ Easting + Northing + Year + Precipitation + I(Precipitation^2) + Snow + I(Snow^2) + geomorphon_40 + Elevation+ I(Elevation^2) + JulianDay + I(JulianDay^2), family = "poisson", data = data, na.action = 'na.fail')
 
-full_model_nb_fmagna = glm.nb(formula = fmagna_ff ~ Easting + Northing + Year + Precipitation + I(Precipitation^2) + Snow + I(Snow^2) + Distance_to_wetland + Elevation + I(Elevation^2) + JulianDay + I(JulianDay^2), data = data, na.action = 'na.fail')
+full_model_nb_fmagna = glm.nb(formula = fmagna_ff ~ Easting + Northing + Year + Precipitation + I(Precipitation^2) + Snow + I(Snow^2) + geomorphon_40 + Elevation + I(Elevation^2) + JulianDay + I(JulianDay^2), data = data, na.action = 'na.fail')
 
 # Absolutely no support for poisson model
 AIC(full_model_poisson_fmagna, full_model_nb_fmagna)
@@ -100,9 +100,9 @@ save(out_poisson_fmagna, file = 'model_combos_poisson_fmagna.Rdata')
 
 # P tenuis
 
-full_model_poisson_dsl = glm(formula = dsl_mb ~ Easting + Northing + Year + Precipitation + I(Precipitation^2) + Snow + I(Snow^2) + Distance_to_wetland + Elevation+ I(Elevation^2) + JulianDay + I(JulianDay^2), family = "poisson", data = data, na.action = 'na.fail')
+full_model_poisson_dsl = glm(formula = dsl_mb ~ Easting + Northing + Year + Precipitation + I(Precipitation^2) + Snow + I(Snow^2) + geomorphon_40 + Elevation+ I(Elevation^2) + JulianDay + I(JulianDay^2), family = "poisson", data = data, na.action = 'na.fail')
 
-full_model_nb_dsl = glm.nb(formula = dsl_mb ~ Easting + Northing + Year + Precipitation + I(Precipitation^2) + Snow + I(Snow^2) + Distance_to_wetland + Elevation + I(Elevation^2) + JulianDay + I(JulianDay^2), data = data, na.action = 'na.fail', init.theta = 0.35)
+full_model_nb_dsl = glm.nb(formula = dsl_mb ~ Easting + Northing + Year + Precipitation + I(Precipitation^2) + Snow + I(Snow^2) + geomorphon_40 + Elevation + I(Elevation^2) + JulianDay + I(JulianDay^2), data = data, na.action = 'na.fail', init.theta = 0.35)
 
 out_nb_dsl = dredge(global.model = full_model_nb_dsl, subset = dc(Elevation, I(Elevation^2), Precipitation, I(Precipitation^2), Snow, I(Snow^2), JulianDay, I(JulianDay^2)))
 out_poisson_dsl = dredge(global.model = full_model_poisson_dsl, subset = dc(Elevation, I(Elevation^2), Precipitation, I(Precipitation^2), Snow, I(Snow^2), JulianDay, I(JulianDay^2)))
