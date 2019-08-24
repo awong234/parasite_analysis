@@ -333,13 +333,14 @@ full_model_ls = list(
 
 save(full_model_ls, file = "model_outputs/logreg/full_model.Rdata")
 
-Cairo::Cairo(width = 1024*3, height = 768*3, file = 'images/logreg_full_cpo.png', dpi = 100*4)
+Cairo::Cairo(width = 1024, height = 1024, file = 'images/logreg_full_cpo.png', dpi = 180)
 ggplot() + 
   geom_point(aes(x = seq_along(full_model$cpo$cpo), y = full_model$cpo$cpo)) +
   theme_bw() + xlab("Index") + ylab("Conditional Predictive Ordinate") + ggtitle("CPO values for the full model fit to binary data")
 dev.off()
 
-Cairo::Cairo(width = 1024*3, height = 768*3, file = 'images/logreg_full_pit.png', dpi = 100*4)
+n = NROW(full_model$cpo$pit)
+Cairo::Cairo(width = 1024, height = 1024, file = 'images/logreg_full_pit.png', dpi = 180)
 ggplot() + 
   geom_point(aes(x = (1:n) / (n+1), y = sort(full_model$cpo$pit))) +
   geom_abline(slope = 1, intercept = 0) +
@@ -347,3 +348,154 @@ ggplot() +
   theme_bw() + xlab("Theoretical quantiles") + ylab("PIT probabilities") + ggtitle("PIT values for the full model fit to binary data")
 dev.off()
 
+plot(full_model$cpo$pit, data$fmagna_ff)
+
+# Zibinomial -------------------------------------------------------------------
+
+zi_full_model = inla(formula = f_magna_models$full_model,
+                  family = 'zeroinflatedbinomial0',
+                  data = inla.stack.data(stk),
+                  control.compute = list(waic = TRUE,
+                                         cpo  = TRUE),
+                  control.predictor = list(A = inla.stack.A(stk))
+)
+
+zi_full_model_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = zi_full_model
+)
+
+save(zi_full_model_ls, file = "model_outputs/logreg/zi_full_model.Rdata")
+
+
+# P tenuis models -----------------------------------------------
+
+p_tenuis_models = list()
+
+# Null model
+
+p_tenuis_models[['null_model']] = as.formula("dsl_mb ~ 1")
+
+# Full model with spatial effect
+p_tenuis_models[['full_model']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation + f(i, model = spde)")
+
+# Full model with elevation random walk
+p_tenuis_models[['full_model_elev_rw']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1') + f(i, model = spde)")
+
+# Reduced models
+
+# Remove spatial effect, all covariates and rw elevation
+p_tenuis_models[['red_mod_minus_speff']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + geomorphon + f(Elevation, model = 'rw1')")
+
+# Remove elevation rw; linear in all covariates
+p_tenuis_models[['red_mod_linear_all_cov']] = as.formula("dsl_mb ~ Easting + Northing + Precipitation + Snow + geomorphon + Elevation")
+
+# Survival hypothesis -- precip, snow, wetland
+p_tenuis_models[['red_mod_survival']] = as.formula("dsl_mb ~ Precipitation + Snow + geomorphon")
+
+# No survival -- large-scale and small-scale spatial variation
+
+p_tenuis_models[['red_mod_spatial']] = as.formula("dsl_mb ~ Easting + Northing + f(i, model = spde)")
+
+# No survival -- with linear elevation also
+
+p_tenuis_models[['red_mod_spatial_elev']] = as.formula("dsl_mb ~ Easting + Northing + f(i, model = spde) + Elevation")
+
+# P tenuis Null model -------------------------------
+
+null_model = inla(formula = p_tenuis_models$null_model, family = 'binomial', data = data, control.compute = list(waic = TRUE, cpo  = TRUE))
+
+null_model_ls = list(
+  "data_stack" = NA,
+  "joint_stack" = NA,
+  "model"      = null_model
+)
+
+save(null_model_ls, file = "model_outputs/ptenuis/null_model.Rdata")
+
+# P tenuis Full model with spatial effect -------------------------------
+
+# Set up stacks
+{
+  
+  
+  # ggplot() +
+  #   gg(data_sp) +
+  #   gg(adk_mesh) +
+  #   gg(adkbound) +
+  #   coord_fixed(ratio = 1)
+  
+  
+  stk <- inla.stack(
+    data = list(dsl_mb = data$dsl_mb),
+    A = list(projector_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = data$Easting,
+        Elevation = data$Elevation,
+        Northing = data$Northing,
+        Precipitation = data$Precipitation,
+        Snow = data$Snow,
+        geomorphon = data$geomorphon
+      )
+    ),
+    tag = 'dat'
+  )
+  
+  stk_predictor = inla.stack(
+    data = list(dsl_mb = NA),
+    A = list(predictor_A, 1),
+    effects = list(
+      list(i = 1:spde$n.spde),
+      data.frame(
+        Intercept = 1,
+        Easting = predict_grid_scaled@data$Easting,
+        Elevation = predict_grid_scaled@data$Elevation,
+        Northing = predict_grid_scaled@data$Northing,
+        Precipitation = predict_grid_scaled@data$Precipitation,
+        Snow = predict_grid_scaled@data$Snow,
+        geomorphon = predict_grid_scaled$geomorphon
+      )
+    ),
+    tag = 'pred'
+  )
+  
+  stk_jp = inla.stack(stk, stk_predictor)
+  
+}
+
+full_model = inla(formula = p_tenuis_models$full_model,
+                  family = 'binomial',
+                  data = inla.stack.data(stk),
+                  control.compute = list(waic = TRUE, cpo  = TRUE),
+                  control.predictor = list(A = inla.stack.A(stk))
+)
+
+full_model_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = full_model
+)
+
+save(full_model_ls, file = "model_outputs/ptenuis/full_model.Rdata")
+
+# zibinomial ptenuis -----------------------------------------------------------
+
+
+zi_full_model = inla(formula = p_tenuis_models$zi_full_model,
+                  family = 'zeroinflatedbinomial0',
+                  data = inla.stack.data(stk),
+                  control.compute = list(waic = TRUE, cpo  = TRUE),
+                  control.predictor = list(A = inla.stack.A(stk))
+)
+
+zi_full_model_ls = list(
+  "data_stack" = stk,
+  "joint_stack" = stk_jp,
+  "model" = zi_full_model
+)
+
+save(zi_full_model_ls, file = "model_outputs/ptenuis/zi_full_model.Rdata")
