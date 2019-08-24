@@ -197,3 +197,27 @@ cpo_vals_ptenuis %>% mutate(response = rep(data$dsl_mb, times = combos)) %>%
   facet_grid(variable ~ pubnames) + 
   theme_bw()
 dev.off()
+
+
+# Binary regressions -----------------------------------------------------------
+
+# Variograms -------------------------------------------------------------------
+
+# Fmagna
+
+coordinates(data) = ~ Easting_real + Northing_real
+
+vgram_fmagna = fields::vgram(coordinates(data), y = data$fmagna_ff, dmax = 10000)
+
+bins = 100
+
+par(mfrow = c(2,1))
+
+plot(vgram_fmagna, pch = 16, N = bins)
+
+
+# Ptenuis
+
+vgram_ptenuis = fields::vgram(coordinates(data), y = data$dsl_mb, dmax=10000)
+
+plot(vgram_ptenuis, pch = 16, N = bins)
