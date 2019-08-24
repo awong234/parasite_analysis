@@ -241,16 +241,16 @@ adk_mesh = inla.mesh.2d(boundary=boundary,
 projector_A = inla.spde.make.A(adk_mesh, loc=data %>% select(Easting_real, Northing_real) %>% as.matrix())
 predictor_A = inla.spde.make.A(adk_mesh, loc = predict_grid_scaled@coords)
 
-
 spde <- inla.spde2.pcmatern(
   mesh = adk_mesh,
   alpha = 2,
   ### mesh and smoothness parameter
-  prior.range = c(1000, 0.01),
+  prior.range = c(100, 0.01),
   ### P(practic.range<0.3)=0.5
-  prior.sigma = c(1, 0.01)
+  prior.sigma = c(35, 0.01)
   ### P(sigma>1)=0.01
 )
+
 
 # Null model -------------------------------
 
